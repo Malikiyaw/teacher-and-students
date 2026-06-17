@@ -1,0 +1,356 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Lunchpad — Real Workflows for Real Builders</title>
+  <meta name="description" content="A curated marketplace of AI workflows that actually save time. Not prompts. Not templates. Real workflows with real results.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#171717',
+            accent: '#D4583A',
+            surface: '#FAFAF8',
+            'surface-alt': '#F0EDE8',
+          },
+          fontFamily: {
+            serif: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          transitionTimingFunction: {
+            'elite': 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="font-sans bg-surface text-ink antialiased">
+
+  <!-- Navbar -->
+  <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-elite">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="flex items-center justify-between h-20">
+        <a href="#" class="flex items-center gap-3 cursor-pointer">
+          <div class="w-10 h-10 bg-ink rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-surface" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <span class="font-serif font-bold text-2xl text-ink tracking-tight">AI Lunchpad</span>
+        </a>
+        <div class="hidden md:flex items-center gap-10">
+          <a href="#marketplace" class="text-sm font-medium text-ink/60 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Workflows</a>
+          <a href="#showcase" class="text-sm font-medium text-ink/60 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Showcase</a>
+          <a href="#tool-finder" class="text-sm font-medium text-ink/60 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Tool Finder</a>
+          <a href="#hub" class="text-sm font-medium text-ink/60 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Hub</a>
+          <a href="#failures" class="text-sm font-medium text-ink/60 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Fails</a>
+        </div>
+        <button onclick="openModal('submit-workflow')" class="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 ease-elite cursor-pointer text-sm">
+          Submit Workflow
+        </button>
+        <button id="mobile-menu-btn" class="md:hidden p-2 cursor-pointer" aria-label="Open menu">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden bg-surface border-t border-ink/5 px-6 pb-6">
+      <a href="#marketplace" class="block py-3 text-sm font-medium text-ink/60 hover:text-accent transition-colors cursor-pointer">Workflows</a>
+      <a href="#showcase" class="block py-3 text-sm font-medium text-ink/60 hover:text-accent transition-colors cursor-pointer">Showcase</a>
+      <a href="#tool-finder" class="block py-3 text-sm font-medium text-ink/60 hover:text-accent transition-colors cursor-pointer">Tool Finder</a>
+      <a href="#hub" class="block py-3 text-sm font-medium text-ink/60 hover:text-accent transition-colors cursor-pointer">Hub</a>
+      <a href="#failures" class="block py-3 text-sm font-medium text-ink/60 hover:text-accent transition-colors cursor-pointer">Fails</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="pt-40 pb-24 lg:pt-52 lg:pb-36">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="max-w-3xl">
+        <p class="text-sm font-medium text-accent tracking-widest uppercase mb-6">Workflows, not prompts</p>
+        <h1 class="font-serif font-bold text-ink leading-[0.95] tracking-tight mb-8" style="font-size: clamp(2.8rem, 6vw, 5.5rem);">
+          Build with AI.<br><span class="text-ink/30">Ship faster.</span>
+        </h1>
+        <p class="text-lg text-ink/50 max-w-xl mb-12 leading-relaxed">
+          A curated marketplace of AI workflows that actually save time. Each workflow includes the prompt, model, results, and time saved.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 max-w-xl">
+          <input id="hero-search" type="text" placeholder="Search workflows, tools, projects..." class="flex-1 px-5 py-4 rounded-lg border border-ink/10 bg-white focus:border-accent focus:ring-0 outline-none text-base transition-colors duration-300 ease-elite">
+          <button class="bg-ink hover:bg-accent text-surface font-medium px-8 py-4 rounded-lg transition-all duration-300 ease-elite cursor-pointer whitespace-nowrap">Search</button>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 mt-6">
+          <span class="text-xs text-ink/30 uppercase tracking-wider">Popular</span>
+          <button onclick="searchWorkflows('Claude Code')" class="text-sm text-ink/40 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Claude Code</button>
+          <button onclick="searchWorkflows('landing page')" class="text-sm text-ink/40 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Landing Page</button>
+          <button onclick="searchWorkflows('automation')" class="text-sm text-ink/40 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">Automation</button>
+          <button onclick="searchWorkflows('SaaS')" class="text-sm text-ink/40 hover:text-accent transition-colors duration-300 ease-elite cursor-pointer">SaaS</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="max-w-7xl mx-auto px-6 lg:px-12"><div class="h-px bg-ink/10"></div></div>
+
+  <!-- Marketplace -->
+  <section id="marketplace" class="py-24 lg:py-36">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-16">
+        <div>
+          <p class="text-xs font-medium text-accent tracking-widest uppercase mb-3">01</p>
+          <h2 class="font-serif font-bold text-4xl lg:text-5xl text-ink tracking-tight">AI Workflows</h2>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="filterMarketplace('all')" class="marketplace-filter active px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="all">All</button>
+          <button onclick="filterMarketplace('coding')" class="marketplace-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="coding">Coding</button>
+          <button onclick="filterMarketplace('design')" class="marketplace-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="design">Design</button>
+          <button onclick="filterMarketplace('business')" class="marketplace-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="business">Business</button>
+          <button onclick="filterMarketplace('content')" class="marketplace-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="content">Content</button>
+        </div>
+      </div>
+      <div id="marketplace-grid" class="marketplace-grid"></div>
+    </div>
+  </section>
+
+  <!-- Showcase -->
+  <section id="showcase" class="py-24 lg:py-36 bg-surface-alt">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-16">
+        <div>
+          <p class="text-xs font-medium text-accent tracking-widest uppercase mb-3">02</p>
+          <h2 class="font-serif font-bold text-4xl lg:text-5xl text-ink tracking-tight">Showcase</h2>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="filterShowcase('all')" class="showcase-filter active px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="all">All</button>
+          <button onclick="filterShowcase('claude')" class="showcase-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="claude">Claude</button>
+          <button onclick="filterShowcase('cursor')" class="showcase-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="cursor">Cursor</button>
+          <button onclick="filterShowcase('chatgpt')" class="showcase-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="chatgpt">ChatGPT</button>
+        </div>
+      </div>
+      <div id="showcase-grid" class="showcase-grid"></div>
+    </div>
+  </section>
+
+  <!-- Tool Finder -->
+  <section id="tool-finder" class="py-24 lg:py-36 bg-ink">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="mb-16">
+        <p class="text-xs font-medium text-accent tracking-widest uppercase mb-3">03</p>
+        <h2 class="font-serif font-bold text-4xl lg:text-5xl text-surface tracking-tight mb-4">Find Your Stack</h2>
+        <p class="text-lg text-surface/40 max-w-xl">Three questions. One personalized toolkit recommendation.</p>
+      </div>
+      <div id="quiz-container" class="max-w-3xl">
+        <div id="quiz-step-1" class="quiz-step">
+          <div class="mb-8">
+            <div class="flex items-center gap-4 mb-6">
+              <span class="w-12 h-12 border border-surface/20 rounded-lg flex items-center justify-center font-serif text-xl text-surface/60">1</span>
+              <h3 class="font-serif text-2xl text-surface">What's your goal?</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onclick="selectQuiz(1, 'writer')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Writer / Creator</div>
+                <div class="text-sm text-surface/40">Blog posts, scripts, content</div>
+              </button>
+              <button onclick="selectQuiz(1, 'developer')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Developer</div>
+                <div class="text-sm text-surface/40">Code, apps, tools</div>
+              </button>
+              <button onclick="selectQuiz(1, 'founder')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Solo Founder</div>
+                <div class="text-sm text-surface/40">Startup, MVP, business</div>
+              </button>
+              <button onclick="selectQuiz(1, 'designer')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Designer</div>
+                <div class="text-sm text-surface/40">UI/UX, graphics, branding</div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="quiz-step-2" class="quiz-step hidden">
+          <div class="mb-8">
+            <div class="flex items-center gap-4 mb-6">
+              <span class="w-12 h-12 border border-surface/20 rounded-lg flex items-center justify-center font-serif text-xl text-surface/60">2</span>
+              <h3 class="font-serif text-2xl text-surface">What's your budget?</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onclick="selectQuiz(2, 'free')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">$0 / Free</div>
+                <div class="text-sm text-surface/40">Only free tools</div>
+              </button>
+              <button onclick="selectQuiz(2, 'low')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">$1-50/mo</div>
+                <div class="text-sm text-surface/40">A few subscriptions</div>
+              </button>
+              <button onclick="selectQuiz(2, 'mid')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">$50-200/mo</div>
+                <div class="text-sm text-surface/40">Serious toolkit</div>
+              </button>
+              <button onclick="selectQuiz(2, 'high')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">$200+/mo</div>
+                <div class="text-sm text-surface/40">No limits</div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="quiz-step-3" class="quiz-step hidden">
+          <div class="mb-8">
+            <div class="flex items-center gap-4 mb-6">
+              <span class="w-12 h-12 border border-surface/20 rounded-lg flex items-center justify-center font-serif text-xl text-surface/60">3</span>
+              <h3 class="font-serif text-2xl text-surface">Your skill level?</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onclick="selectQuiz(3, 'beginner')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Beginner</div>
+                <div class="text-sm text-surface/40">Just getting started</div>
+              </button>
+              <button onclick="selectQuiz(3, 'intermediate')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Intermediate</div>
+                <div class="text-sm text-surface/40">Use AI daily</div>
+              </button>
+              <button onclick="selectQuiz(3, 'advanced')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Advanced</div>
+                <div class="text-sm text-surface/40">Power user</div>
+              </button>
+              <button onclick="selectQuiz(3, 'expert')" class="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300 ease-elite cursor-pointer">
+                <div class="font-medium text-surface mb-1">Expert</div>
+                <div class="text-sm text-surface/40">Build with AI APIs</div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="quiz-result" class="quiz-step hidden">
+          <div class="mb-8">
+            <div class="flex items-center gap-4 mb-6">
+              <span class="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
+                <svg class="w-6 h-6 text-surface" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <h3 class="font-serif text-2xl text-surface">Your AI Stack</h3>
+            </div>
+            <p id="quiz-result-desc" class="text-surface/40 mb-8"></p>
+            <div id="quiz-result-tools" class="space-y-3"></div>
+            <button onclick="resetQuiz()" class="mt-8 w-full py-4 rounded-lg border border-surface/10 text-surface/60 font-medium hover:border-accent hover:text-surface transition-all duration-300 ease-elite cursor-pointer">Start Over</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hub -->
+  <section id="hub" class="py-24 lg:py-36">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-16">
+        <div>
+          <p class="text-xs font-medium text-accent tracking-widest uppercase mb-3">04</p>
+          <h2 class="font-serif font-bold text-4xl lg:text-5xl text-ink tracking-tight">VibeCoder Hub</h2>
+        </div>
+        <button onclick="openModal('submit-post')" class="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 ease-elite cursor-pointer text-sm">Share Post</button>
+      </div>
+      <div id="hub-grid" class="hub-grid"></div>
+    </div>
+  </section>
+
+  <!-- Failures -->
+  <section id="failures" class="py-24 lg:py-36 bg-surface-alt">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-16">
+        <div>
+          <p class="text-xs font-medium text-accent tracking-widest uppercase mb-3">05</p>
+          <h2 class="font-serif font-bold text-4xl lg:text-5xl text-ink tracking-tight">AI Failures DB</h2>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="filterFailures('all')" class="failures-filter active px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="all">All</button>
+          <button onclick="filterFailures('coding')" class="failures-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="coding">Coding</button>
+          <button onclick="filterFailures('design')" class="failures-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="design">Design</button>
+          <button onclick="filterFailures('hallucination')" class="failures-filter px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-elite cursor-pointer" data-filter="hallucination">Hallucination</button>
+        </div>
+      </div>
+      <div id="failures-grid" class="failures-grid"></div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-ink py-20">
+    <div class="max-w-7xl mx-auto px-6 lg:px-12">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-10 mb-16">
+        <div class="col-span-2 md:col-span-1">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 bg-surface/10 rounded-lg flex items-center justify-center">
+              <svg class="w-5 h-5 text-surface" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <span class="font-serif font-bold text-xl text-surface">AI Lunchpad</span>
+          </div>
+          <p class="text-sm text-surface/30 leading-relaxed">Real workflows for real builders. Not prompts. Not templates.</p>
+        </div>
+        <div>
+          <h4 class="font-medium text-surface text-sm mb-5">Product</h4>
+          <ul class="space-y-3 text-sm text-surface/30">
+            <li><a href="#marketplace" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Workflows</a></li>
+            <li><a href="#showcase" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Showcase</a></li>
+            <li><a href="#tool-finder" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Tool Finder</a></li>
+            <li><a href="#hub" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Hub</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-medium text-surface text-sm mb-5">Community</h4>
+          <ul class="space-y-3 text-sm text-surface/30">
+            <li><a href="#hub" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Posts</a></li>
+            <li><a href="#failures" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Failures DB</a></li>
+            <li><a href="#" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Newsletter</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-medium text-surface text-sm mb-5">Connect</h4>
+          <ul class="space-y-3 text-sm text-surface/30">
+            <li><a href="#" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Twitter / X</a></li>
+            <li><a href="#" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">Discord</a></li>
+            <li><a href="#" class="hover:text-surface transition-colors duration-300 ease-elite cursor-pointer">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-surface/5 pt-8 text-center text-sm text-surface/20">&copy; 2026 AI Lunchpad. Built with AI, for AI builders.</div>
+    </div>
+  </footer>
+
+  <!-- Submit Workflow Modal -->
+  <div id="modal-submit-workflow" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="modal-backdrop absolute inset-0 bg-ink/60" onclick="closeModal('submit-workflow')"></div>
+    <div class="modal-content relative bg-surface rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-8">
+      <button onclick="closeModal('submit-workflow')" class="absolute top-4 right-4 p-2 text-ink/30 hover:text-ink transition-colors duration-300 ease-elite cursor-pointer" aria-label="Close">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+      <h3 class="font-serif font-bold text-2xl text-ink mb-6">Submit a Workflow</h3>
+      <form id="submit-workflow-form" class="space-y-4">
+        <div><label class="block text-sm font-medium text-ink mb-2">Workflow Title</label><input type="text" required class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white" placeholder="e.g. Build a SaaS landing page in 15 min"></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">Category</label><select class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white"><option>Coding</option><option>Design</option><option>Business</option><option>Content</option></select></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">AI Model Used</label><input type="text" class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white" placeholder="e.g. Claude 3.5 Sonnet"></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">The Prompt / Workflow</label><textarea rows="4" class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white resize-none" placeholder="Paste your prompt or workflow steps..."></textarea></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">Time Saved (approx)</label><input type="text" class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white" placeholder="e.g. 2 hours"></div>
+        <button type="submit" class="w-full bg-ink hover:bg-accent text-surface font-medium py-3 rounded-lg transition-all duration-300 ease-elite cursor-pointer">Submit Workflow</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Submit Post Modal -->
+  <div id="modal-submit-post" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="modal-backdrop absolute inset-0 bg-ink/60" onclick="closeModal('submit-post')"></div>
+    <div class="modal-content relative bg-surface rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-8">
+      <button onclick="closeModal('submit-post')" class="absolute top-4 right-4 p-2 text-ink/30 hover:text-ink transition-colors duration-300 ease-elite cursor-pointer" aria-label="Close">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+      <h3 class="font-serif font-bold text-2xl text-ink mb-6">Share a Post</h3>
+      <form id="submit-post-form" class="space-y-4">
+        <div><label class="block text-sm font-medium text-ink mb-2">Title</label><input type="text" required class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white" placeholder="e.g. My Cursor setup for rapid prototyping"></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">Type</label><select class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white"><option>Prompt</option><option>Cursor Rule</option><option>Claude Setup</option><option>MCP Server</option><option>Workflow</option></select></div>
+        <div><label class="block text-sm font-medium text-ink mb-2">Content</label><textarea rows="4" class="w-full px-4 py-3 rounded-lg border border-ink/10 focus:border-accent focus:ring-0 outline-none transition-colors duration-300 ease-elite bg-white resize-none" placeholder="Share your prompt, rule, or setup..."></textarea></div>
+        <button type="submit" class="w-full bg-ink hover:bg-accent text-surface font-medium py-3 rounded-lg transition-all duration-300 ease-elite cursor-pointer">Share Post</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
