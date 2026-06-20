@@ -13,8 +13,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "AI Lunchpad — Component Library",
-  description: "SplineScene, PixelHero, and Spotlight components",
+  title: "AI Lunchpad — Real Workflows for Real Builders",
+  description: "A curated marketplace of AI workflows that actually save time. Not prompts. Not templates. Real workflows with real results.",
 };
 
 export default function RootLayout({

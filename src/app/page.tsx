@@ -1,21 +1,24 @@
-import Link from "next/link";
-import { SplineSceneBasic } from "@/components/ui/demo-spline";
+import { Navbar } from '@/components/lunchpad/navbar';
+import { Hero } from '@/components/lunchpad/hero';
+import { Marketplace } from '@/components/lunchpad/marketplace';
+import { Showcase } from '@/components/lunchpad/showcase';
+import { ToolFinder } from '@/components/lunchpad/tool-finder';
+import { Hub } from '@/components/lunchpad/hub';
+import { Failures } from '@/components/lunchpad/failures';
+import { Footer } from '@/components/lunchpad/footer';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background">
-      <nav className="flex items-center justify-center gap-6 py-6 text-sm text-muted-foreground">
-        <Link href="/" className="hover:text-foreground transition-colors">
-          SplineScene
-        </Link>
-        <Link href="/hero-demo" className="hover:text-foreground transition-colors">
-          PixelHero
-        </Link>
-        <Link href="/spotlight-demo" className="hover:text-foreground transition-colors">
-          Spotlights
-        </Link>
-      </nav>
-      <SplineSceneBasic />
-    </main>
+    <>
+      <Navbar />
+      <Hero />
+      <div className="max-w-7xl mx-auto px-6 lg:px-12"><div className="h-px bg-ink/10" /></div>
+      <Marketplace />
+      <Showcase />
+      <ToolFinder />
+      <Hub />
+      <Failures />
+      <Footer />
+    </>
   );
 }
