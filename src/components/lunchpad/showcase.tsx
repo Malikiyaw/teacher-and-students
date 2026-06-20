@@ -59,7 +59,11 @@ function ShowcaseCard({ showcase: s, isFirst }: { showcase: Showcase; isFirst: b
           <span className={`tag tag-${s.tool}`}>{s.tool}</span>
           <span className="text-xs text-ink/30">Built in {s.builtIn}</span>
         </div>
-        <h3 className="font-[family-name:var(--font-serif)] font-bold text-lg text-ink mb-2">{s.title}</h3>
+        <h3 className="font-[family-name:var(--font-serif)] font-bold text-lg text-ink mb-2">
+          {s.url ? (
+            <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:text-accent transition-colors duration-300">{s.title}</a>
+          ) : s.title}
+        </h3>
         <p className="text-sm text-ink/40 mb-4 leading-relaxed">{s.description}</p>
         <div className="flex items-center justify-between mt-auto">
           <span className={`text-sm font-medium ${s.revenue !== 'Free' ? 'text-accent' : 'text-ink/30'}`}>{s.revenue}</span>
