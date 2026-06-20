@@ -45,9 +45,9 @@ export function Navbar() {
               </a>
             ))}
           </div>
-          <button className="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 text-sm hidden md:block">
+          <a href="mailto:submit@ailunchpad.com?subject=Submit%20Workflow&body=Workflow%20Name%3A%0ATool%3A%0ADescription%3A%0ATime%20Saved%3A" className="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 text-sm hidden md:block">
             Submit Workflow
-          </button>
+          </a>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2"

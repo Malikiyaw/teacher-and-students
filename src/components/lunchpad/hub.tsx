@@ -3,8 +3,13 @@
 import { useState } from 'react';
 import { HUB_POSTS, type HubPost } from '@/lib/data';
 
+const TYPES = ['all', 'Cursor Rule', 'Prompt', 'Setup', 'MCP Server', 'Workflow', 'Best Practice'];
+
 export function Hub() {
   const [posts, setPosts] = useState(HUB_POSTS);
+  const [filter, setFilter] = useState('all');
+
+  const filtered = posts.filter((p) => filter === 'all' || p.type === filter);
 
   const likePost = (id: number) => {
     setPosts(posts.map((p) => (p.id === id ? { ...p, likes: p.likes + 1 } : p)));
@@ -18,10 +23,23 @@ export function Hub() {
             <p className="text-xs font-medium text-accent tracking-widest uppercase mb-3">04</p>
             <h2 className="font-[family-name:var(--font-serif)] font-bold text-4xl lg:text-5xl text-ink tracking-tight">VibeCoder Hub</h2>
           </div>
-          <button className="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 text-sm">Share Post</button>
+          <a href="mailto:share@ailunchpad.com?subject=Share%20Post&body=Type%3A%0ATitle%3A%0AContent%3A" className="bg-ink hover:bg-accent text-surface font-medium px-6 py-2.5 rounded-lg transition-all duration-300 text-sm">Share Post</a>
+        </div>
+        <div className="flex gap-2 flex-wrap mb-10">
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => setFilter(t)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                filter === t ? 'bg-ink text-surface' : 'text-ink/40 hover:text-ink'
+              }`}
+            >
+              {t === 'all' ? 'All' : t}
+            </button>
+          ))}
         </div>
         <div className="hub-grid">
-          {posts.map((p, i) => (
+          {filtered.map((p, i) => (
             <HubCard key={p.id} post={p} isFirst={i === 0} onLike={likePost} />
           ))}
         </div>

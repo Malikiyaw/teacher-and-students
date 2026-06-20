@@ -8,8 +8,13 @@ const TOOLS = ['all', 'claude', 'cursor', 'chatgpt'];
 
 export function Showcase() {
   const [filter, setFilter] = useState('all');
+  const [items, setItems] = useState(SHOWCASES);
 
-  const filtered = SHOWCASES.filter((s) => filter === 'all' || s.tool === filter);
+  const filtered = items.filter((s) => filter === 'all' || s.tool === filter);
+
+  const likeShowcase = (id: number) => {
+    setItems(items.map((s) => (s.id === id ? { ...s, likes: s.likes + 1 } : s)));
+  };
 
   return (
     <section id="showcase" className="py-24 lg:py-36 bg-surface-alt">
@@ -35,7 +40,7 @@ export function Showcase() {
         </div>
         <div className="showcase-grid">
           {filtered.map((s, i) => (
-            <ShowcaseCard key={s.id} showcase={s} isFirst={i === 0} />
+            <ShowcaseCard key={s.id} showcase={s} isFirst={i === 0} onLike={likeShowcase} />
           ))}
         </div>
       </div>
@@ -43,9 +48,14 @@ export function Showcase() {
   );
 }
 
-function ShowcaseCard({ showcase: s, isFirst }: { showcase: Showcase; isFirst: boolean }) {
+function ShowcaseCard({ showcase: s, isFirst, onLike }: { showcase: Showcase; isFirst: boolean; onLike: (id: number) => void }) {
+  const Wrapper = s.url ? 'a' : 'div';
+  const wrapperProps = s.url
+    ? { href: s.url, target: '_blank', rel: 'noopener noreferrer' }
+    : {};
+
   return (
-    <div className={`card group relative ${isFirst ? 'card-feature' : ''}`}>
+    <Wrapper {...wrapperProps} className={`card group relative block ${isFirst ? 'card-feature' : ''} ${s.url ? 'cursor-pointer' : ''}`}>
       <Spotlight className="-top-40 left-0 md:-top-20 md:left-40 opacity-0 group-hover:opacity-100 transition-opacity duration-500" fill="#D4583A" />
       <div className="relative z-10">
         {isFirst && (
@@ -61,20 +71,23 @@ function ShowcaseCard({ showcase: s, isFirst }: { showcase: Showcase; isFirst: b
         </div>
         <h3 className="font-[family-name:var(--font-serif)] font-bold text-lg text-ink mb-2">
           {s.url ? (
-            <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:text-accent transition-colors duration-300">{s.title}</a>
+            <span className="hover:text-accent transition-colors duration-300">{s.title}</span>
           ) : s.title}
         </h3>
         <p className="text-sm text-ink/40 mb-4 leading-relaxed">{s.description}</p>
         <div className="flex items-center justify-between mt-auto">
           <span className={`text-sm font-medium ${s.revenue !== 'Free' ? 'text-accent' : 'text-ink/30'}`}>{s.revenue}</span>
-          <div className="flex items-center gap-1 text-xs text-ink/35">
+          <button
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onLike(s.id); }}
+            className="upvote-btn flex items-center gap-1.5 text-xs text-ink/35"
+          >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
             {s.likes}
-          </div>
+          </button>
         </div>
       </div>
-    </div>
+    </Wrapper>
   );
 }

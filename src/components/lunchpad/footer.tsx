@@ -28,15 +28,12 @@ export function Footer() {
             <ul className="space-y-3 text-sm text-surface/30">
               <li><a href="#hub" className="hover:text-surface transition-colors duration-300">Posts</a></li>
               <li><a href="#failures" className="hover:text-surface transition-colors duration-300">Failures DB</a></li>
-              <li><a href="#" className="hover:text-surface transition-colors duration-300">Newsletter</a></li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium text-surface text-sm mb-5">Connect</h4>
             <ul className="space-y-3 text-sm text-surface/30">
-              <li><a href="#" className="hover:text-surface transition-colors duration-300">Twitter / X</a></li>
-              <li><a href="#" className="hover:text-surface transition-colors duration-300">Discord</a></li>
-              <li><a href="#" className="hover:text-surface transition-colors duration-300">GitHub</a></li>
+              <li><a href="https://github.com/Malikiyaw/ai-lunch" target="_blank" rel="noopener noreferrer" className="hover:text-surface transition-colors duration-300">GitHub</a></li>
             </ul>
           </div>
         </div>

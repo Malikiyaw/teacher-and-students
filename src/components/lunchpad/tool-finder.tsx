@@ -5,22 +5,85 @@ import { TOOL_STACKS } from '@/lib/data';
 
 type QuizAnswers = { goal?: string; budget?: string; level?: string };
 
+const TOOL_URLS: Record<string, string> = {
+  'ChatGPT': 'https://chat.openai.com',
+  'ChatGPT Free': 'https://chat.openai.com',
+  'Claude': 'https://claude.ai',
+  'Claude Free': 'https://claude.ai',
+  'Claude Pro': 'https://claude.ai',
+  'Claude Code': 'https://claude.ai/code',
+  'Claude Code Free': 'https://claude.ai/code',
+  'Claude Code Max': 'https://claude.ai/code',
+  'Claude Team': 'https://claude.ai',
+  'Claude API': 'https://docs.anthropic.com',
+  'Cursor': 'https://cursor.com',
+  'Cursor Free': 'https://cursor.com',
+  'Cursor Pro': 'https://cursor.com',
+  'Cursor Business': 'https://cursor.com',
+  'GitHub Copilot Free': 'https://github.com/features/copilot',
+  'GitHub Copilot': 'https://github.com/features/copilot',
+  'GitHub Copilot Pro': 'https://github.com/features/copilot',
+  'GitHub Copilot Max': 'https://github.com/features/copilot',
+  'GitHub Copilot Business': 'https://github.com/features/copilot',
+  'Supabase': 'https://supabase.com',
+  'Supabase Free': 'https://supabase.com',
+  'Supabase Pro': 'https://supabase.com',
+  'Vercel': 'https://vercel.com',
+  'Vercel Free': 'https://vercel.com',
+  'Vercel Pro': 'https://vercel.com',
+  'Perplexity': 'https://perplexity.ai',
+  'Perplexity Free': 'https://perplexity.ai',
+  'Figma': 'https://figma.com',
+  'Figma Free': 'https://figma.com',
+  'Figma Pro': 'https://figma.com',
+  'Canva': 'https://canva.com',
+  'Canva Free': 'https://canva.com',
+  'Canva Pro': 'https://canva.com',
+  'Midjourney': 'https://midjourney.com',
+  'Grammarly': 'https://grammarly.com',
+  'Grammarly Free': 'https://grammarly.com',
+  'Grammarly Premium': 'https://grammarly.com',
+  'Notion': 'https://notion.so',
+  'Jasper': 'https://jasper.ai',
+  'Surfer SEO': 'https://surferseo.com',
+  'Descript': 'https://descript.com',
+  'Otter.ai Free': 'https://otter.ai',
+  'Full Stack': 'https://vercel.com',
+  'Full Stack Free': 'https://vercel.com',
+};
+
 export function ToolFinder() {
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<QuizAnswers>({});
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const select = (key: keyof QuizAnswers, value: string) => {
+    setSelectedOption(value);
     const next = { ...answers, [key]: value };
     setAnswers(next);
     setTimeout(() => {
+      setSelectedOption(null);
       if (step < 3) setStep(step + 1);
       else setStep(4);
     }, 400);
   };
 
+  const back = () => {
+    if (step === 2) {
+      const { goal, ...rest } = answers;
+      setAnswers(rest);
+      setStep(1);
+    } else if (step === 3) {
+      const { budget, ...rest } = answers;
+      setAnswers(rest);
+      setStep(2);
+    }
+  };
+
   const reset = () => {
     setAnswers({});
     setStep(1);
+    setSelectedOption(null);
   };
 
   const stack = step === 4
@@ -56,7 +119,7 @@ export function ToolFinder() {
                   { value: 'founder', label: 'Solo Founder', desc: 'Startup, MVP, business' },
                   { value: 'designer', label: 'Designer', desc: 'UI/UX, graphics, branding' },
                 ].map((opt) => (
-                  <button key={opt.value} onClick={() => select('goal', opt.value)} className="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300">
+                  <button key={opt.value} onClick={() => select('goal', opt.value)} className={`quiz-option text-left p-5 rounded-lg border transition-all duration-300 ${selectedOption === opt.value ? 'selected border-accent' : 'border-surface/10 hover:border-accent'}`}>
                     <div className="font-medium text-surface mb-1">{opt.label}</div>
                     <div className="text-sm text-surface/40">{opt.desc}</div>
                   </button>
@@ -77,12 +140,13 @@ export function ToolFinder() {
                   { value: 'mid', label: '$50-200/mo', desc: 'Serious toolkit' },
                   { value: 'high', label: '$200+/mo', desc: 'No limits' },
                 ].map((opt) => (
-                  <button key={opt.value} onClick={() => select('budget', opt.value)} className="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300">
+                  <button key={opt.value} onClick={() => select('budget', opt.value)} className={`quiz-option text-left p-5 rounded-lg border transition-all duration-300 ${selectedOption === opt.value ? 'selected border-accent' : 'border-surface/10 hover:border-accent'}`}>
                     <div className="font-medium text-surface mb-1">{opt.label}</div>
                     <div className="text-sm text-surface/40">{opt.desc}</div>
                   </button>
                 ))}
               </div>
+              <button onClick={back} className="mt-6 text-sm text-surface/40 hover:text-surface transition-colors duration-300">&larr; Back</button>
             </div>
           )}
           {step === 3 && (
@@ -98,12 +162,13 @@ export function ToolFinder() {
                   { value: 'advanced', label: 'Advanced', desc: 'Power user' },
                   { value: 'expert', label: 'Expert', desc: 'Build with AI APIs' },
                 ].map((opt) => (
-                  <button key={opt.value} onClick={() => select('level', opt.value)} className="quiz-option text-left p-5 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300">
+                  <button key={opt.value} onClick={() => select('level', opt.value)} className={`quiz-option text-left p-5 rounded-lg border transition-all duration-300 ${selectedOption === opt.value ? 'selected border-accent' : 'border-surface/10 hover:border-accent'}`}>
                     <div className="font-medium text-surface mb-1">{opt.label}</div>
                     <div className="text-sm text-surface/40">{opt.desc}</div>
                   </button>
                 ))}
               </div>
+              <button onClick={back} className="mt-6 text-sm text-surface/40 hover:text-surface transition-colors duration-300">&larr; Back</button>
             </div>
           )}
           {step === 4 && (
@@ -118,22 +183,30 @@ export function ToolFinder() {
               </div>
               <p className="text-surface/40 mb-8">{descriptions[answers.goal || 'developer']?.[answers.budget || 'free'] || 'Your personalized AI toolkit'}</p>
               <div className="space-y-3">
-                {stack.map((t, i) => (
-                  <div key={i} className="tool-card">
-                    <div className="w-10 h-10 bg-surface/5 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 text-surface/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-surface text-sm">{t.name}</div>
-                      <div className="text-xs text-surface/35 truncate">{t.desc}</div>
-                    </div>
-                    <span className="text-xs font-medium text-accent flex-shrink-0">{t.price}</span>
-                  </div>
-                ))}
+                {stack.map((t, i) => {
+                  const url = TOOL_URLS[t.name];
+                  const Wrapper = url ? 'a' : 'div';
+                  const wrapperProps = url ? { href: url, target: '_blank', rel: 'noopener noreferrer' } : {};
+                  return (
+                    <Wrapper key={i} {...wrapperProps} className="tool-card flex items-center gap-4 p-4 rounded-lg border border-surface/10 hover:border-accent transition-all duration-300">
+                      <div className="w-10 h-10 bg-surface/5 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-surface/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-surface text-sm">{t.name}</div>
+                        <div className="text-xs text-surface/35 truncate">{t.desc}</div>
+                      </div>
+                      <span className="text-xs font-medium text-accent flex-shrink-0">{t.price}</span>
+                    </Wrapper>
+                  );
+                })}
               </div>
-              <button onClick={reset} className="mt-8 w-full py-4 rounded-lg border border-surface/10 text-surface/60 font-medium hover:border-accent hover:text-surface transition-all duration-300">Start Over</button>
+              <div className="flex gap-3 mt-8">
+                <button onClick={back} className="flex-1 py-4 rounded-lg border border-surface/10 text-surface/60 font-medium hover:border-accent hover:text-surface transition-all duration-300">&larr; Back</button>
+                <button onClick={reset} className="flex-1 py-4 rounded-lg bg-accent text-surface font-medium hover:bg-accent/90 transition-all duration-300">Start Over</button>
+              </div>
             </div>
           )}
         </div>

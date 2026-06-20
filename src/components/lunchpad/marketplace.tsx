@@ -8,13 +8,9 @@ const CATEGORIES = ['all', 'coding', 'design', 'business', 'content'];
 
 export function Marketplace() {
   const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const filtered = WORKFLOWS.filter((w) => {
-    const matchFilter = filter === 'all' || w.category === filter;
-    const matchSearch = !search || w.title.toLowerCase().includes(search) || w.tags.some((t) => t.includes(search));
-    return matchFilter && matchSearch;
-  });
+  const filtered = WORKFLOWS.filter((w) => filter === 'all' || w.category === filter);
 
   return (
     <section id="marketplace" className="py-24 lg:py-36">
@@ -42,7 +38,13 @@ export function Marketplace() {
         </div>
         <div className="marketplace-grid">
           {filtered.map((w, i) => (
-            <MarketplaceCard key={w.id} workflow={w} isFirst={i === 0} />
+            <MarketplaceCard
+              key={w.id}
+              workflow={w}
+              isFirst={i === 0}
+              isExpanded={expandedId === w.id}
+              onToggle={() => setExpandedId(expandedId === w.id ? null : w.id)}
+            />
           ))}
         </div>
       </div>
@@ -50,9 +52,15 @@ export function Marketplace() {
   );
 }
 
-function MarketplaceCard({ workflow: w, isFirst }: { workflow: Workflow; isFirst: boolean }) {
+function MarketplaceCard({ workflow: w, isFirst, isExpanded, onToggle }: { workflow: Workflow; isFirst: boolean; isExpanded: boolean; onToggle: () => void }) {
   return (
-    <div className={`card group relative ${isFirst ? 'card-first' : ''}`}>
+    <div
+      className={`card group relative cursor-pointer ${isFirst ? 'card-first' : ''} ${isExpanded ? 'ring-1 ring-accent' : ''}`}
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle(); }}
+    >
       <Spotlight className="-top-40 left-0 md:-top-20 md:left-40 opacity-0 group-hover:opacity-100 transition-opacity duration-500" fill="#D4583A" />
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-4">
@@ -61,6 +69,16 @@ function MarketplaceCard({ workflow: w, isFirst }: { workflow: Workflow; isFirst
         </div>
         <h3 className="font-[family-name:var(--font-serif)] font-bold text-xl text-ink mb-3 leading-snug">{w.title}</h3>
         <p className="text-sm text-ink/45 mb-6 leading-relaxed">{w.description}</p>
+        {isExpanded && (
+          <div className="mb-6 pt-4 border-t border-ink/5">
+            <p className="text-xs font-medium text-ink/30 uppercase tracking-wider mb-2">Tags</p>
+            <div className="flex flex-wrap gap-2">
+              {w.tags.map((tag) => (
+                <span key={tag} className="text-xs px-2.5 py-1 rounded-md bg-ink/5 text-ink/40">{tag}</span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between mt-auto">
           <span className="text-xs text-ink/30">{w.model}</span>
           <div className="flex items-center gap-3">

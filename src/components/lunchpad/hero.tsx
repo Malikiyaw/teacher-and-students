@@ -19,6 +19,12 @@ export function Hero() {
               <p className="mt-4 text-neutral-300 max-w-lg">
                 A curated marketplace of AI workflows that actually save time. Each workflow includes the prompt, model, results, and time saved.
               </p>
+              <a href="#tool-finder" className="mt-8 inline-flex items-center gap-2 bg-accent hover:bg-accent/90 text-surface font-medium px-6 py-3 rounded-lg transition-all duration-300 text-sm">
+                Find Your Stack
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </a>
             </div>
             <div className="flex-1 relative min-h-[300px]">
               <SplineScene
