@@ -2,11 +2,66 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Eye, EyeOff, GraduationCap, BookOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, GraduationCap, BookOpen, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<"teacher" | "student">("teacher");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [school, setSchool] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: `${firstName} ${lastName}`.trim(),
+          role,
+          school,
+        },
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      router.push("/dashboard");
+      router.refresh();
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          role,
+        },
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-sm mx-auto">
@@ -17,7 +72,13 @@ export default function SignupPage() {
         Free forever for basic features. No credit card needed.
       </p>
 
-      <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl mb-5">
+          {error}
+        </div>
+      )}
+
+      <form className="space-y-5" onSubmit={handleSignup}>
         <div>
           <label className="text-xs font-medium text-charcoal/60 mb-2 block">
             I am a...
@@ -57,7 +118,10 @@ export default function SignupPage() {
             </label>
             <input
               type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               placeholder="Jane"
+              required
               className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300"
             />
           </div>
@@ -67,7 +131,10 @@ export default function SignupPage() {
             </label>
             <input
               type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               placeholder="Smith"
+              required
               className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300"
             />
           </div>
@@ -79,7 +146,10 @@ export default function SignupPage() {
           </label>
           <input
             type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="you@school.edu"
+            required
             className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300"
           />
         </div>
@@ -91,7 +161,11 @@ export default function SignupPage() {
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="At least 8 characters"
+              required
+              minLength={8}
               className="w-full bg-white border border-border rounded-xl px-4 py-3 pr-11 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300"
             />
             <button
@@ -115,6 +189,8 @@ export default function SignupPage() {
             </label>
             <input
               type="text"
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
               placeholder="Lincoln High School"
               className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300"
             />
@@ -123,9 +199,19 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          className="w-full bg-sienna text-white text-sm font-medium py-3 rounded-xl hover:bg-sienna-dark transition-all duration-300 cubic-bezier(0.25, 0.8, 0.25, 1) hover:shadow-lg hover:shadow-sienna/15"
+          disabled={loading}
+          className="w-full bg-sienna text-white text-sm font-medium py-3 rounded-xl hover:bg-sienna-dark transition-all duration-300 cubic-bezier(0.25, 0.8, 0.25, 1) hover:shadow-lg hover:shadow-sienna/15 disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {role === "teacher" ? "Create Teacher Account" : "Create Student Account"}
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Creating account...
+            </>
+          ) : role === "teacher" ? (
+            "Create Teacher Account"
+          ) : (
+            "Create Student Account"
+          )}
         </button>
       </form>
 
@@ -142,26 +228,32 @@ export default function SignupPage() {
 
       <button
         type="button"
-        className="w-full border border-border bg-white text-sm font-medium text-charcoal py-3 rounded-xl hover:border-charcoal/20 transition-all duration-300 flex items-center justify-center gap-2"
+        onClick={handleGoogleSignup}
+        disabled={googleLoading}
+        className="w-full border border-border bg-white text-sm font-medium text-charcoal py-3 rounded-xl hover:border-charcoal/20 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        <svg className="w-4 h-4" viewBox="0 0 24 24">
-          <path
-            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-            fill="#4285F4"
-          />
-          <path
-            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            fill="#34A853"
-          />
-          <path
-            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-            fill="#FBBC05"
-          />
-          <path
-            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            fill="#EA4335"
-          />
-        </svg>
+        {googleLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+              fill="#4285F4"
+            />
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              fill="#34A853"
+            />
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              fill="#EA4335"
+            />
+          </svg>
+        )}
         Continue with Google
       </button>
 
