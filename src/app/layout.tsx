@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { DM_Serif_Display, Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-sans",
+const dmSerif = DM_Serif_Display({
+  weight: "400",
   subsets: ["latin"],
+  variable: "--font-heading",
+  display: "swap",
 });
 
-const playfair = Playfair_Display({
-  variable: "--font-serif",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AI Lunchpad — Real Workflows for Real Builders",
-  description: "A curated marketplace of AI workflows that actually save time. Not prompts. Not templates. Real workflows with real results.",
+  title: "ClassDeck — Where Presentations Come Alive",
+  description:
+    "A presentation platform built for classrooms. Create, present, and engage students with real-time polls, quizzes, and collaborative tools.",
 };
 
 export default function RootLayout({
@@ -23,11 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${playfair.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${dmSerif.variable} ${inter.variable} h-full`}>
+      <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );
 }
