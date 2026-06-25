@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Presentation,
   LayoutDashboard,
@@ -44,10 +44,12 @@ export default function DashboardLayout({
     role: string;
     plan: string;
   } | null>(null);
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
+      const supabase = createClient();
+      supabaseRef.current = supabase;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
@@ -63,9 +65,10 @@ export default function DashboardLayout({
       if (data) setProfile(data);
     };
     fetchProfile();
-  }, [supabase, router]);
+  }, [router]);
 
   const handleLogout = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
   };
