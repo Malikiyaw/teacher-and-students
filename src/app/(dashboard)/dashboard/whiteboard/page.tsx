@@ -288,6 +288,7 @@ export default function WhiteboardPage() {
             { id: "eraser" as Tool, icon: Eraser, label: "Eraser" },
             { id: "rect" as Tool, icon: Square, label: "Rectangle" },
             { id: "circle" as Tool, icon: Circle, label: "Circle" },
+            { id: "text" as Tool, icon: Type, label: "Text" },
           ].map((t) => (
             <button
               key={t.id}

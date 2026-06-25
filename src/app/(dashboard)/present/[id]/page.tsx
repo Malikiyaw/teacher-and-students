@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, Maximize, Minimize, Users, Timer,
   Vote, X, MessageSquare, Loader2, Hand, SmilePlus, AlertTriangle,
-  StopCircle, Send, Code,
+  StopCircle, Send,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +23,7 @@ interface SlideElement {
   fontWeight?: string;
   fontStyle?: string;
   borderRadius?: number;
+  zIndex?: number;
 }
 interface Slide {
   id: string;
@@ -376,7 +377,7 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
         {slide ? (
           <div className="w-full max-w-5xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg"
             style={{ background: slide.background }}>
-            {(slide.elements || []).sort((a, b) => 0).map((el) => (
+            {(slide.elements || []).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => (
               <div key={el.id} className="absolute"
                 style={{
                   left: el.x ?? 0, top: el.y ?? 0,
@@ -532,9 +533,10 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
       {showReactions && (
         <div className="fixed bottom-20 right-1/2 translate-x-1/2 bg-white rounded-full shadow-xl px-4 py-2 z-[120] flex items-center gap-3">
           {reactionEmojis.map((emoji) => (
-            <button key={emoji} onClick={() => {
+            <button key={emoji} onClick={async () => {
               if (!room) return;
-              supabase.from("reactions").insert({ room_id: room.id, user_id: "00000000-0000-0000-0000-000000000000", emoji });
+              const { data: { user } } = await supabase.auth.getUser();
+              supabase.from("reactions").insert({ room_id: room.id, user_id: user?.id || "", emoji });
               setShowReactions(false);
             }}
               className="text-2xl hover:scale-125 transition-transform">{emoji}</button>

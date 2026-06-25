@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Presentation, Users, BarChart3, Clock } from "lucide-react";
+import { Users, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function StudentDashboard() {

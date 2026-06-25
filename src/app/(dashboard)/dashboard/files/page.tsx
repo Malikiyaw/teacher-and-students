@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, File, Image, Trash2, Download, Search } from "lucide-react";
+import { Upload, File, Image, Trash2, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface FileItem {
@@ -25,6 +25,7 @@ export default function FilesPage() {
     const fetchFiles = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
+      setUserId(user.id);
 
       const { data } = await supabase.storage.from("files").list(user.id, {
         limit: 50,
@@ -64,8 +65,11 @@ export default function FilesPage() {
     setFiles((prev) => prev.filter((f) => f.name !== fileName));
   };
 
+  const [userId, setUserId] = useState<string | null>(null);
+
   const getFileUrl = (fileName: string) => {
-    const { data } = supabase.storage.from("files").getPublicUrl(fileName);
+    if (!userId) return "";
+    const { data } = supabase.storage.from("files").getPublicUrl(`${userId}/${fileName}`);
     return data.publicUrl;
   };
 

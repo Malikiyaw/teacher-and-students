@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Users, Check, Settings, Presentation, Copy } from "lucide-react";
+import { ArrowLeft, Users, Check, Presentation, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function NewRoomPage() {

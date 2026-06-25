@@ -23,7 +23,7 @@ interface PresentationItem {
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string; plan: string } | null>(null);
   const [presentations, setPresentations] = useState<PresentationItem[]>([]);
   const [stats, setStats] = useState({
     totalPresentations: 0,
@@ -41,7 +41,7 @@ export default function TeacherDashboard() {
 
       const { data: p } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, plan")
         .eq("id", user.id)
         .single();
       if (p) setProfile(p);
@@ -128,7 +128,7 @@ export default function TeacherDashboard() {
             </div>
             <span className="text-xs text-charcoal/40 font-medium">Plan</span>
           </div>
-          <div className="font-heading text-3xl text-charcoal">Starter</div>
+          <div className="font-heading text-3xl text-charcoal">{profile?.plan === "pro" ? "Pro" : "Starter"}</div>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ import {
   Plus, Trash2, Type, Image, Square, Palette, ChevronDown,
   Undo2, Redo2, Play, Share2, Save, ArrowLeft, MousePointer2,
   Loader2, Copy, ArrowUp, ArrowDown, StickyNote, Settings,
-  ChevronRight, Link2, Code, Minus, Bold, Italic,
+  Code, Minus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -485,6 +485,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <Image className="w-4 h-4" />
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </label>
+            <button onClick={() => { const url = prompt("Enter YouTube video URL:"); if (url) { addElement("youtube"); const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = updated[activeSlide].elements[updated[activeSlide].elements.length - 1]; if (el) { el.content = url; updateSlides(updated); } } }} className="p-2 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all" title="YouTube Video">
+              <Play className="w-4 h-4" />
+            </button>
             <div className="w-px h-5 bg-white/10 mx-1" />
             <div className="relative">
               <button onClick={() => setShowBgMenu(!showBgMenu)} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 px-3 py-1.5 hover:bg-white/5 rounded-lg transition-all">
@@ -531,6 +534,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     <div className="w-full h-full" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                   ) : el.type === "image" ? (
                     <img src={el.content} alt="" className="w-full h-full object-cover rounded" style={{ borderRadius: el.borderRadius || 0 }} draggable={false} />
+                  ) : el.type === "youtube" ? (
+                    <iframe src={el.content.replace(/youtube\.com\/watch\?v=/, "youtube.com/embed/").replace(/youtu\.be\//, "youtube.com/embed/")} className="w-full h-full" allowFullScreen />
                   ) : (
                     <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                   )}

@@ -15,7 +15,6 @@ export default function AnalyticsPage() {
   });
   const [topPresentations, setTopPresentations] = useState<Array<{
     title: string;
-    views: number;
     updated_at: string;
   }>>([]);
   const supabase = createClient();
@@ -60,7 +59,7 @@ export default function AnalyticsPage() {
       });
 
       if (pres) {
-        setTopPresentations(pres.map((p: any) => ({ ...p, views: Math.floor(Math.random() * 50) + 10 })));
+        setTopPresentations(pres as any);
       }
     };
     fetchData();

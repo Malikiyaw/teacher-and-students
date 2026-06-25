@@ -15,8 +15,6 @@ import {
   X,
   Plus,
   PenTool,
-  Vote,
-  Timer,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 

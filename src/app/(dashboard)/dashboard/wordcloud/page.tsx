@@ -11,7 +11,6 @@ export default function WordCloudPage() {
   const [roomId, setRoomId] = useState("");
   const [rooms, setRooms] = useState<{ id: string; name: string }[]>([]);
   const [launching, setLaunching] = useState(false);
-  const [activeClouds, setActiveClouds] = useState<{ id: string; question: string; room_name: string; word_count: number }[]>([]);
   const router = useRouter();
   const supabase = createClient();
 

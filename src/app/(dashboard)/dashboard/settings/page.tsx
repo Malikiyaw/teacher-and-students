@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { User, Bell, Lock, Trash2, Camera, Check, Loader2, CreditCard, Zap } from "lucide-react";
+import { User, Camera, Check, Loader2, CreditCard, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState({ full_name: "", email: "", school: "", role: "teacher", plan: "starter" });
+  const [profile, setProfile] = useState({ full_name: "", email: "", school: "", role: "teacher", plan: "starter", avatar_url: "" });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function SettingsPage() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, email, school, role, plan")
+        .select("full_name, email, school, role, plan, avatar_url")
         .eq("id", user.id)
         .single();
 
@@ -58,6 +60,23 @@ export default function SettingsPage() {
     setUpgrading(false);
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setUploadingAvatar(false); return; }
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/avatar.${ext}`;
+    await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+    if (urlData) {
+      await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
+      setProfile((prev) => ({ ...prev, avatar_url: urlData.publicUrl }));
+    }
+    setUploadingAvatar(false);
+  };
+
   const initials = profile.full_name
     ? profile.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
@@ -75,10 +94,15 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center gap-5 mb-6">
             <div className="relative">
-              <div className="w-20 h-20 bg-charcoal/8 rounded-full flex items-center justify-center text-xl font-heading text-charcoal">{initials}</div>
-              <button className="absolute bottom-0 right-0 w-7 h-7 bg-sienna text-white rounded-full flex items-center justify-center hover:bg-sienna-dark transition-colors">
-                <Camera className="w-3.5 h-3.5" />
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-20 h-20 rounded-full object-cover" />
+              ) : (
+                <div className="w-20 h-20 bg-charcoal/8 rounded-full flex items-center justify-center text-xl font-heading text-charcoal">{initials}</div>
+              )}
+              <button onClick={() => fileInputRef.current?.click()} className="absolute bottom-0 right-0 w-7 h-7 bg-sienna text-white rounded-full flex items-center justify-center hover:bg-sienna-dark transition-colors">
+                {uploadingAvatar ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
               </button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
             </div>
             <div>
               <div className="text-sm font-medium text-charcoal">{profile.full_name || "Your Name"}</div>

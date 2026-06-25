@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Presentation, Clock, MoreHorizontal, Grid3X3, List, Trash2, Search } from "lucide-react";
+import { Plus, Presentation, Clock, Trash2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface PresentationItem {

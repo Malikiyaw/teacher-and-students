@@ -4,7 +4,7 @@ import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
 import {
   Presentation, Users, Check, Loader2, Hand, MessageSquare,
-  SmilePlus, StickyNote, Clock, Trophy, ChevronRight,
+  SmilePlus, StickyNote, Clock, Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
