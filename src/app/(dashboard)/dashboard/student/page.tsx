@@ -1,138 +1,133 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { Presentation, Users, BarChart3, Clock, ArrowRight } from "lucide-react";
-
-const enrolledClasses = [
-  {
-    id: "1",
-    teacher: "Ms. Rodriguez",
-    name: "Biology 101",
-    subject: "Science",
-    nextClass: "Today, 2:00 PM",
-    color: "bg-[#E8D5C4]",
-  },
-  {
-    id: "2",
-    teacher: "Mr. Chen",
-    name: "History 201",
-    subject: "History",
-    nextClass: "Tomorrow, 9:00 AM",
-    color: "bg-[#C4D5E0]",
-  },
-  {
-    id: "3",
-    teacher: "Mrs. Patel",
-    name: "Math 301",
-    subject: "Mathematics",
-    nextClass: "Wednesday, 11:00 AM",
-    color: "bg-[#D5E0C4]",
-  },
-];
-
-const recentActivity = [
-  { type: "quiz", title: "Biology Quiz: Cell Structure", score: "8/10", date: "Yesterday" },
-  { type: "poll", title: "History: Most Influential Leader?", voted: "Abraham Lincoln", date: "2 days ago" },
-  { type: "quiz", title: "Math: Linear Equations", score: "9/10", date: "Last week" },
-];
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Presentation, Users, BarChart3, Clock } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function StudentDashboard() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<{ full_name: string } | null>(null);
   const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [joinedRoom, setJoinedRoom] = useState<{ name: string; code: string } | null>(null);
+  const [myRooms, setMyRooms] = useState<Array<{ id: string; name: string; code: string; created_at: string }>>([]);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+
+      const { data: p } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+      if (p) setProfile(p);
+
+      const { data: participations } = await supabase
+        .from("room_participants")
+        .select("room_id, rooms(id, name, code, created_at)")
+        .eq("student_id", user.id);
+
+      if (participations) {
+        const rooms = participations.map((p) => (p as unknown as { rooms: { id: string; name: string; code: string; created_at: string } }).rooms).filter(Boolean);
+        setMyRooms(rooms);
+      }
+    };
+    fetchData();
+  }, [supabase, router]);
+
+  const joinRoom = async () => {
+    if (joinCode.length !== 4) return;
+    setJoinError("");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: room, error } = await supabase
+      .from("rooms")
+      .select("id, name, code")
+      .eq("code", joinCode.toUpperCase())
+      .eq("status", "active")
+      .single();
+
+    if (error || !room) {
+      setJoinError("Room not found or ended");
+      return;
+    }
+
+    await supabase.from("room_participants").upsert({
+      room_id: room.id,
+      student_id: user.id,
+    }, { onConflict: "room_id,student_id" });
+
+    setJoinedRoom(room);
+    setJoinCode("");
+  };
+
+  const firstName = profile?.full_name?.split(" ")[0] || "there";
 
   return (
     <div className="max-w-6xl">
       <div className="mb-10">
         <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">
-          Welcome back, Alex
+          Welcome back, {firstName}
         </h1>
         <p className="text-sm text-charcoal/45">
-          You have 1 class today. Biology at 2:00 PM.
+          You&apos;re enrolled in {myRooms.length} class{myRooms.length !== 1 ? "es" : ""}.
         </p>
       </div>
 
       {/* Join Room */}
       <div className="mb-12">
-        <h2 className="font-heading text-xl text-charcoal mb-5">
-          Join a Class
-        </h2>
+        <h2 className="font-heading text-xl text-charcoal mb-5">Join a Class</h2>
         <div className="flex gap-3 max-w-md">
           <input
             type="text"
             placeholder="Enter room code (e.g. ABCD)"
             value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(""); }}
             className="flex-1 bg-white border border-border rounded-xl px-4 py-3 text-sm text-charcoal placeholder:text-charcoal/30 focus:outline-none focus:border-sienna/40 focus:ring-1 focus:ring-sienna/20 transition-all duration-300 tracking-widest font-medium text-center text-lg"
-            maxLength={6}
+            maxLength={4}
           />
-          <button className="bg-sienna text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-sienna-dark transition-all duration-300 cubic-bezier(0.25, 0.8, 0.25, 1) flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Join
+          <button
+            onClick={joinRoom}
+            className="bg-sienna text-white text-sm font-medium px-6 py-3 rounded-xl hover:bg-sienna-dark transition-all duration-300 flex items-center gap-2"
+          >
+            <Users className="w-4 h-4" /> Join
           </button>
         </div>
+        {joinError && <p className="text-xs text-red-500 mt-2">{joinError}</p>}
+        {joinedRoom && (
+          <div className="mt-4 bg-[#16A34A]/5 border border-[#16A34A]/20 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-[#16A34A]">Joined {joinedRoom.name}</p>
+              <p className="text-xs text-charcoal/40">Code: {joinedRoom.code}</p>
+            </div>
+            <a href={`/present/view/${joinedRoom.code}`} className="text-xs font-medium text-sienna hover:text-sienna-dark">View Presentation →</a>
+          </div>
+        )}
       </div>
 
       {/* Enrolled Classes */}
-      <div className="mb-12">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-heading text-xl text-charcoal">
-            My Classes
-          </h2>
-          <button className="text-xs font-medium text-sienna hover:text-sienna-dark transition-colors flex items-center gap-1">
-            Browse Catalog <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {enrolledClasses.map((cls) => (
-            <div
-              key={cls.id}
-              className="bg-white border border-border rounded-xl p-5 hover:border-charcoal/15 transition-all duration-300"
-            >
-              <div className={`${cls.color} w-full h-2 rounded-full mb-4`} />
-              <h3 className="text-sm font-medium text-charcoal mb-1">
-                {cls.name}
-              </h3>
-              <p className="text-xs text-charcoal/40 mb-4">{cls.teacher}</p>
-              <div className="flex items-center gap-2 text-xs text-charcoal/40">
-                <Clock className="w-3 h-3" />
-                {cls.nextClass}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Activity */}
       <div>
-        <h2 className="font-heading text-xl text-charcoal mb-5">
-          Recent Activity
-        </h2>
-        <div className="bg-white border border-border rounded-xl divide-y divide-border">
-          {recentActivity.map((activity, i) => (
-            <div key={i} className="flex items-center gap-4 p-4">
-              <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center shrink-0">
-                {activity.type === "quiz" ? (
-                  <BarChart3 className="w-4 h-4 text-sienna" />
-                ) : (
-                  <Presentation className="w-4 h-4 text-sienna" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-charcoal truncate">
-                  {activity.title}
-                </div>
-                <div className="text-xs text-charcoal/40">
-                  {activity.type === "quiz"
-                    ? `Score: ${activity.score}`
-                    : `Your vote: ${activity.voted}`}
+        <h2 className="font-heading text-xl text-charcoal mb-5">My Classes</h2>
+        {myRooms.length === 0 ? (
+          <div className="bg-white border border-border rounded-xl p-10 text-center">
+            <Users className="w-10 h-10 text-charcoal/10 mx-auto mb-3" />
+            <p className="text-sm text-charcoal/40">No classes yet. Join one with a room code above.</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myRooms.map((room) => (
+              <div key={room.id} className="bg-white border border-border rounded-xl p-5 hover:border-charcoal/15 transition-all duration-300">
+                <h3 className="text-sm font-medium text-charcoal mb-1">{room.name}</h3>
+                <div className="flex items-center gap-2 text-xs text-charcoal/40">
+                  <Clock className="w-3 h-3" />
+                  Code: {room.code}
                 </div>
               </div>
-              <div className="text-xs text-charcoal/30 shrink-0">
-                {activity.date}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

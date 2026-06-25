@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Presentation,
@@ -7,88 +11,130 @@ import {
   ArrowRight,
   BarChart3,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-const recentPresentations = [
-  {
-    id: "1",
-    title: "Photosynthesis Deep Dive",
-    subject: "Biology 101",
-    slides: 18,
-    lastEdited: "2 hours ago",
-    thumbnail: "bg-[#E8D5C4]",
-  },
-  {
-    id: "2",
-    title: "World War II Timeline",
-    subject: "History 201",
-    slides: 24,
-    lastEdited: "Yesterday",
-    thumbnail: "bg-[#C4D5E0]",
-  },
-  {
-    id: "3",
-    title: "Introduction to Algebra",
-    subject: "Math 301",
-    slides: 12,
-    lastEdited: "3 days ago",
-    thumbnail: "bg-[#D5E0C4]",
-  },
-  {
-    id: "4",
-    title: "Shakespeare's Hamlet Act III",
-    subject: "English 102",
-    slides: 32,
-    lastEdited: "Last week",
-    thumbnail: "bg-[#E0C4D5]",
-  },
-];
-
-const stats = [
-  { label: "Total Presentations", value: "12", icon: Presentation, change: "+2 this week" },
-  { label: "Students Reached", value: "148", icon: Users, change: "Across 4 classes" },
-  { label: "Avg. Engagement", value: "73%", icon: BarChart3, change: "+5% from last month" },
-];
+interface PresentationItem {
+  id: string;
+  title: string;
+  subject: string | null;
+  slides: unknown[];
+  updated_at: string;
+}
 
 export default function TeacherDashboard() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+  const [presentations, setPresentations] = useState<PresentationItem[]>([]);
+  const [stats, setStats] = useState({
+    totalPresentations: 0,
+    totalRooms: 0,
+  });
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+      if (p) setProfile(p);
+
+      const { data: pres } = await supabase
+        .from("presentations")
+        .select("id, title, subject, slides, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(4);
+      if (pres) {
+        setPresentations(pres);
+        setStats((s) => ({ ...s, totalPresentations: pres.length }));
+      }
+
+      const { count } = await supabase
+        .from("rooms")
+        .select("*", { count: "exact", head: true })
+        .eq("teacher_id", user.id);
+      setStats((s) => ({ ...s, totalRooms: count || 0 }));
+    };
+    fetchData();
+  }, [supabase, router]);
+
+  const getTimeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return "Yesterday";
+    return `${days} days ago`;
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const firstName = profile?.full_name?.split(" ")[0] || "there";
+
   return (
     <div className="max-w-6xl">
       <div className="mb-10">
         <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">
-          Good afternoon, Jane
+          {getGreeting()}, {firstName}
         </h1>
         <p className="text-sm text-charcoal/45">
-          You have 2 classes today. Your Biology presentation is ready to go.
+          You have {stats.totalRooms} room{stats.totalRooms !== 1 ? "s" : ""} and {stats.totalPresentations} presentation{stats.totalPresentations !== 1 ? "s" : ""}.
         </p>
       </div>
 
       {/* Stats */}
       <div className="grid sm:grid-cols-3 gap-4 mb-12">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white border border-border rounded-xl p-5"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
-                <stat.icon className="w-4 h-4 text-sienna" />
-              </div>
-              <span className="text-xs text-charcoal/40 font-medium">
-                {stat.label}
-              </span>
+        <div className="bg-white border border-border rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
+              <Presentation className="w-4 h-4 text-sienna" />
             </div>
-            <div className="font-heading text-3xl text-charcoal mb-1">
-              {stat.value}
-            </div>
-            <div className="text-xs text-charcoal/40">{stat.change}</div>
+            <span className="text-xs text-charcoal/40 font-medium">Presentations</span>
           </div>
-        ))}
+          <div className="font-heading text-3xl text-charcoal">
+            {stats.totalPresentations}
+          </div>
+        </div>
+        <div className="bg-white border border-border rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
+              <Users className="w-4 h-4 text-sienna" />
+            </div>
+            <span className="text-xs text-charcoal/40 font-medium">Rooms Created</span>
+          </div>
+          <div className="font-heading text-3xl text-charcoal">
+            {stats.totalRooms}
+          </div>
+        </div>
+        <div className="bg-white border border-border rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-sienna" />
+            </div>
+            <span className="text-xs text-charcoal/40 font-medium">Plan</span>
+          </div>
+          <div className="font-heading text-3xl text-charcoal">Starter</div>
+        </div>
       </div>
 
       {/* Quick Actions */}
       <div className="mb-12">
-        <h2 className="font-heading text-xl text-charcoal mb-5">
-          Quick Actions
-        </h2>
+        <h2 className="font-heading text-xl text-charcoal mb-5">Quick Actions</h2>
         <div className="grid sm:grid-cols-3 gap-4">
           <Link
             href="/editor/new"
@@ -110,25 +156,19 @@ export default function TeacherDashboard() {
               <Users className="w-5 h-5 text-charcoal/50" />
             </div>
             <div>
-              <div className="text-sm font-medium text-charcoal">
-                Start a Room
-              </div>
-              <div className="text-xs text-charcoal/40">
-                Students join with code
-              </div>
+              <div className="text-sm font-medium text-charcoal">Start a Room</div>
+              <div className="text-xs text-charcoal/40">Students join with code</div>
             </div>
           </Link>
           <Link
-            href="/templates"
+            href="/dashboard/templates"
             className="flex items-center gap-4 bg-white border border-border p-5 rounded-xl hover:border-charcoal/20 transition-all duration-300 group"
           >
             <div className="w-10 h-10 bg-charcoal/5 rounded-lg flex items-center justify-center group-hover:bg-charcoal/8 transition-colors">
               <Presentation className="w-5 h-5 text-charcoal/50" />
             </div>
             <div>
-              <div className="text-sm font-medium text-charcoal">
-                Browse Templates
-              </div>
+              <div className="text-sm font-medium text-charcoal">Browse Templates</div>
               <div className="text-xs text-charcoal/40">12 free templates</div>
             </div>
           </Link>
@@ -138,9 +178,7 @@ export default function TeacherDashboard() {
       {/* Recent Presentations */}
       <div>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="font-heading text-xl text-charcoal">
-            Recent Presentations
-          </h2>
+          <h2 className="font-heading text-xl text-charcoal">Recent Presentations</h2>
           <Link
             href="/dashboard/presentations"
             className="text-xs font-medium text-sienna hover:text-sienna-dark transition-colors flex items-center gap-1"
@@ -148,38 +186,47 @@ export default function TeacherDashboard() {
             View All <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {recentPresentations.map((pres) => (
+        {presentations.length === 0 ? (
+          <div className="bg-white border border-border rounded-xl p-10 text-center">
+            <Presentation className="w-10 h-10 text-charcoal/15 mx-auto mb-3" />
+            <p className="text-sm text-charcoal/40 mb-4">No presentations yet</p>
             <Link
-              key={pres.id}
-              href={`/editor/${pres.id}`}
-              className="group bg-white border border-border rounded-xl overflow-hidden hover:border-charcoal/15 transition-all duration-300"
+              href="/editor/new"
+              className="text-sm font-medium text-sienna hover:text-sienna-dark transition-colors"
             >
-              <div
-                className={`${pres.thumbnail} h-32 flex items-center justify-center relative`}
-              >
-                <Presentation className="w-8 h-8 text-charcoal/10" />
-                <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-medium text-charcoal/60 px-2.5 py-1 rounded-md">
-                  {pres.slides} slides
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-charcoal mb-1 group-hover:text-sienna transition-colors">
-                  {pres.title}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-charcoal/40">
-                    {pres.subject}
-                  </span>
-                  <span className="text-xs text-charcoal/30 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {pres.lastEdited}
-                  </span>
-                </div>
-              </div>
+              Create your first presentation →
             </Link>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {presentations.map((pres) => (
+              <Link
+                key={pres.id}
+                href={`/editor/${pres.id}`}
+                className="group bg-white border border-border rounded-xl overflow-hidden hover:border-charcoal/15 transition-all duration-300"
+              >
+                <div className="bg-[#E8D5C4] h-32 flex items-center justify-center relative">
+                  <Presentation className="w-8 h-8 text-charcoal/10" />
+                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-medium text-charcoal/60 px-2.5 py-1 rounded-md">
+                    {(pres.slides as unknown[]).length || 0} slides
+                  </div>
+                </div>
+                <div className="p-4">
+                  <h3 className="text-sm font-medium text-charcoal mb-1 group-hover:text-sienna transition-colors">
+                    {pres.title}
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-charcoal/40">{pres.subject || "No subject"}</span>
+                    <span className="text-xs text-charcoal/30 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {getTimeAgo(pres.updated_at)}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

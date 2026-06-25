@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   Presentation,
   LayoutDashboard,
@@ -14,7 +14,11 @@ import {
   Menu,
   X,
   Plus,
+  PenTool,
+  Vote,
+  Timer,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +26,7 @@ const navItems = [
   { href: "/dashboard/rooms", label: "Rooms", icon: Users },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/files", label: "Files", icon: FolderOpen },
+  { href: "/dashboard/tools", label: "Classroom Tools", icon: PenTool },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -31,7 +36,43 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profile, setProfile] = useState<{
+    full_name: string;
+    email: string;
+    role: string;
+    plan: string;
+  } | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, email, role, plan")
+        .eq("id", user.id)
+        .single();
+
+      if (data) setProfile(data);
+    };
+    fetchProfile();
+  }, [supabase, router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
 
   return (
     <div className="min-h-screen bg-cream flex">
@@ -50,7 +91,9 @@ export default function DashboardLayout({
 
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
@@ -70,7 +113,7 @@ export default function DashboardLayout({
 
         <div className="px-3 py-4 border-t border-border">
           <Link
-            href="/dashboard/new"
+            href="/editor/new"
             className="flex items-center justify-center gap-2 bg-sienna text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-sienna-dark transition-all duration-300 mb-3"
           >
             <Plus className="w-4 h-4" />
@@ -78,17 +121,17 @@ export default function DashboardLayout({
           </Link>
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 bg-charcoal/8 rounded-full flex items-center justify-center text-xs font-medium text-charcoal">
-              JD
+              {initials}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-charcoal truncate">
-                Jane Doe
+                {profile?.full_name || "Loading..."}
               </div>
               <div className="text-xs text-charcoal/40 truncate">
-                jane@school.edu
+                {profile?.email || ""}
               </div>
             </div>
-            <button className="text-charcoal/30 hover:text-charcoal/50 transition-colors">
+            <button onClick={handleLogout} className="text-charcoal/30 hover:text-charcoal/50 transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -125,7 +168,9 @@ export default function DashboardLayout({
 
         <nav className="px-3 py-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
@@ -156,8 +201,12 @@ export default function DashboardLayout({
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
-            <span className="text-xs text-charcoal/30 bg-sienna/8 text-sienna px-3 py-1 rounded-full font-medium">
-              Starter Plan
+            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+              profile?.plan === "pro"
+                ? "bg-sienna/10 text-sienna"
+                : "bg-charcoal/5 text-charcoal/40"
+            }`}>
+              {profile?.plan === "pro" ? "Pro Plan" : "Starter Plan"}
             </span>
           </div>
         </header>
