@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Presentation, Clock, MoreHorizontal, Grid3X3, List, Trash2 } from "lucide-react";
+import { Plus, Presentation, Clock, MoreHorizontal, Grid3X3, List, Trash2, Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface PresentationItem {
@@ -18,6 +18,7 @@ interface PresentationItem {
 export default function PresentationsPage() {
   const router = useRouter();
   const [presentations, setPresentations] = useState<PresentationItem[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -54,6 +55,8 @@ export default function PresentationsPage() {
     return days <= 1 ? "Yesterday" : `${days} days ago`;
   };
 
+  const filtered = search ? presentations.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()) || (p.subject || "").toLowerCase().includes(search.toLowerCase())) : presentations;
+
   const colors = ["bg-[#E8D5C4]", "bg-[#C4D5E0]", "bg-[#D5E0C4]", "bg-[#E0C4D5]", "bg-[#D5C4E0]", "bg-[#E0D5C4]"];
 
   return (
@@ -64,6 +67,12 @@ export default function PresentationsPage() {
           <p className="text-sm text-charcoal/45">{presentations.length} presentation{presentations.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-charcoal/30 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="bg-white border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-charcoal placeholder:text-charcoal/30 outline-none focus:border-sienna/40 w-52 transition-all" />
+          </div>
           <Link
             href="/editor/new"
             className="flex items-center gap-2 bg-sienna text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-sienna-dark transition-all duration-300"
@@ -86,7 +95,7 @@ export default function PresentationsPage() {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {presentations.map((pres, i) => (
+          {filtered.map((pres, i) => (
             <div key={pres.id} className="group bg-white border border-border rounded-xl overflow-hidden hover:border-charcoal/15 transition-all duration-300">
               <Link href={`/editor/${pres.id}`} className="block">
                 <div className={`${colors[i % colors.length]} h-36 flex items-center justify-center relative`}>

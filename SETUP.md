@@ -108,6 +108,103 @@ create table public.quiz_responses (
   completed_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Chat messages
+create table public.chat_messages (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  content text not null,
+  is_announcement boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Reactions
+create table public.reactions (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  emoji text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Hand raises
+create table public.hand_raises (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  is_raised boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(room_id, student_id)
+);
+
+-- Word clouds
+create table public.word_clouds (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  question text not null,
+  words jsonb not null default '[]'::jsonb,
+  is_active boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Word cloud submissions
+create table public.word_submissions (
+  id uuid default gen_random_uuid() primary key,
+  word_cloud_id uuid references public.word_clouds(id) on delete cascade not null,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  word text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Exit tickets
+create table public.exit_tickets (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  question text not null default 'What did you learn today?',
+  is_active boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Exit ticket responses
+create table public.exit_ticket_responses (
+  id uuid default gen_random_uuid() primary key,
+  exit_ticket_id uuid references public.exit_tickets(id) on delete cascade not null,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  response text not null,
+  rating integer check (rating >= 1 and rating <= 5),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(exit_ticket_id, student_id)
+);
+
+-- Student notes
+create table public.student_notes (
+  id uuid default gen_random_uuid() primary key,
+  presentation_id uuid references public.presentations(id) on delete cascade not null,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  slide_index integer not null,
+  content text not null default '',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(presentation_id, student_id, slide_index)
+);
+
+-- Attendance
+create table public.attendance (
+  id uuid default gen_random_uuid() primary key,
+  room_id uuid references public.rooms(id) on delete cascade not null,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  joined_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  left_at timestamp with time zone,
+  unique(room_id, student_id)
+);
+
+-- Folders
+create table public.folders (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  name text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- Enable Row Level Security
 alter table public.profiles enable row level security;
 alter table public.presentations enable row level security;
@@ -117,6 +214,19 @@ alter table public.polls enable row level security;
 alter table public.poll_votes enable row level security;
 alter table public.quizzes enable row level security;
 alter table public.quiz_responses enable row level security;
+alter table public.chat_messages enable row level security;
+alter table public.reactions enable row level security;
+alter table public.hand_raises enable row level security;
+alter table public.word_clouds enable row level security;
+alter table public.word_submissions enable row level security;
+alter table public.exit_tickets enable row level security;
+alter table public.exit_ticket_responses enable row level security;
+alter table public.student_notes enable row level security;
+alter table public.attendance enable row level security;
+alter table public.folders enable row level security;
+
+-- Add current_slide to rooms
+alter table public.rooms add column if not exists current_slide integer default 0;
 
 -- Policies
 create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
@@ -156,6 +266,59 @@ create policy "Students can submit quiz responses" on public.quiz_responses for 
 create policy "Teachers can view quiz responses" on public.quiz_responses for select using (
   exists (select 1 from public.quizzes q join public.rooms r on r.id = q.room_id where q.id = quiz_id and r.teacher_id = auth.uid())
 );
+
+-- Chat policies
+create policy "Users can view chat messages" on public.chat_messages for select using (
+  exists (select 1 from public.rooms where id = room_id and (teacher_id = auth.uid() or status = 'active'))
+);
+create policy "Users can send chat messages" on public.chat_messages for insert with check (auth.uid() = user_id);
+
+-- Reaction policies
+create policy "Users can view reactions" on public.reactions for select using (
+  exists (select 1 from public.rooms where id = room_id and (teacher_id = auth.uid() or status = 'active'))
+);
+create policy "Users can send reactions" on public.reactions for insert with check (auth.uid() = user_id);
+
+-- Hand raise policies
+create policy "Users can view hand raises" on public.hand_raises for select using (
+  exists (select 1 from public.rooms where id = room_id and teacher_id = auth.uid())
+  or student_id = auth.uid()
+);
+create policy "Students can toggle hand raise" on public.hand_raises for all using (auth.uid() = student_id);
+
+-- Word cloud policies
+create policy "Teachers can manage word clouds" on public.word_clouds for all using (
+  exists (select 1 from public.rooms where id = room_id and teacher_id = auth.uid())
+);
+create policy "Students can view active word clouds" on public.word_clouds for select using (is_active = true);
+create policy "Students can submit words" on public.word_submissions for insert with check (auth.uid() = student_id);
+create policy "Users can view word submissions" on public.word_submissions for select using (
+  exists (select 1 from public.word_clouds wc join public.rooms r on r.id = wc.room_id where wc.id = word_cloud_id and r.teacher_id = auth.uid())
+  or student_id = auth.uid()
+);
+
+-- Exit ticket policies
+create policy "Teachers can manage exit tickets" on public.exit_tickets for all using (
+  exists (select 1 from public.rooms where id = room_id and teacher_id = auth.uid())
+);
+create policy "Students can view active exit tickets" on public.exit_tickets for select using (is_active = true);
+create policy "Students can submit exit ticket" on public.exit_ticket_responses for insert with check (auth.uid() = student_id);
+create policy "Teachers can view exit ticket responses" on public.exit_ticket_responses for select using (
+  exists (select 1 from public.exit_tickets et join public.rooms r on r.id = et.room_id where et.id = exit_ticket_id and r.teacher_id = auth.uid())
+);
+
+-- Student notes policies
+create policy "Students can manage own notes" on public.student_notes for all using (auth.uid() = student_id);
+
+-- Attendance policies
+create policy "Teachers can view attendance" on public.attendance for select using (
+  exists (select 1 from public.rooms where id = room_id and teacher_id = auth.uid())
+);
+create policy "Students can insert attendance" on public.attendance for insert with check (auth.uid() = student_id);
+create policy "Students can update own attendance" on public.attendance for update using (auth.uid() = student_id);
+
+-- Folder policies
+create policy "Users can manage own folders" on public.folders for all using (auth.uid() = user_id);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()

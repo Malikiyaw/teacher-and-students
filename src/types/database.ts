@@ -261,6 +261,51 @@ export interface Database {
           created_at?: string;
         };
       };
+      reactions: {
+        Row: { id: string; room_id: string; user_id: string; emoji: string; created_at: string };
+        Insert: { id?: string; room_id: string; user_id: string; emoji: string; created_at?: string };
+        Update: { id?: string; room_id?: string; user_id?: string; emoji?: string; created_at?: string };
+      };
+      hand_raises: {
+        Row: { id: string; room_id: string; student_id: string; is_raised: boolean; created_at: string };
+        Insert: { id?: string; room_id: string; student_id: string; is_raised?: boolean; created_at?: string };
+        Update: { id?: string; room_id?: string; student_id?: string; is_raised?: boolean; created_at?: string };
+      };
+      word_clouds: {
+        Row: { id: string; room_id: string; question: string; words: Json; is_active: boolean; created_at: string };
+        Insert: { id?: string; room_id: string; question: string; words?: Json; is_active?: boolean; created_at?: string };
+        Update: { id?: string; room_id?: string; question?: string; words?: Json; is_active?: boolean; created_at?: string };
+      };
+      word_submissions: {
+        Row: { id: string; word_cloud_id: string; student_id: string; word: string; created_at: string };
+        Insert: { id?: string; word_cloud_id: string; student_id: string; word: string; created_at?: string };
+        Update: { id?: string; word_cloud_id?: string; student_id?: string; word?: string; created_at?: string };
+      };
+      exit_tickets: {
+        Row: { id: string; room_id: string; question: string; is_active: boolean; created_at: string };
+        Insert: { id?: string; room_id: string; question?: string; is_active?: boolean; created_at?: string };
+        Update: { id?: string; room_id?: string; question?: string; is_active?: boolean; created_at?: string };
+      };
+      exit_ticket_responses: {
+        Row: { id: string; exit_ticket_id: string; student_id: string; response: string; rating: number | null; created_at: string };
+        Insert: { id?: string; exit_ticket_id: string; student_id: string; response: string; rating?: number | null; created_at?: string };
+        Update: { id?: string; exit_ticket_id?: string; student_id?: string; response?: string; rating?: number | null; created_at?: string };
+      };
+      student_notes: {
+        Row: { id: string; presentation_id: string; student_id: string; slide_index: number; content: string; created_at: string };
+        Insert: { id?: string; presentation_id: string; student_id: string; slide_index: number; content?: string; created_at?: string };
+        Update: { id?: string; presentation_id?: string; student_id?: string; slide_index?: number; content?: string; created_at?: string };
+      };
+      attendance: {
+        Row: { id: string; room_id: string; student_id: string; joined_at: string; left_at: string | null };
+        Insert: { id?: string; room_id: string; student_id: string; joined_at?: string; left_at?: string | null };
+        Update: { id?: string; room_id?: string; student_id?: string; joined_at?: string; left_at?: string | null };
+      };
+      folders: {
+        Row: { id: string; user_id: string; name: string; created_at: string };
+        Insert: { id?: string; user_id: string; name: string; created_at?: string };
+        Update: { id?: string; user_id?: string; name?: string; created_at?: string };
+      };
     };
   };
 }
