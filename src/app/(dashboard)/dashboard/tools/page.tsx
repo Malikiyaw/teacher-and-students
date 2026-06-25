@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Vote, Brain, Timer, PenTool, ArrowRight, Cloud, MessageSquareText, Users, BarChart3 } from "lucide-react";
+import { Vote, Brain, Timer, PenTool, ArrowRight, Cloud, MessageSquareText, Users, BarChart3, BookOpen, UserSearch, Layout } from "lucide-react";
 
 const tools = [
   { icon: Vote, title: "Create Poll", desc: "Ask a question, get instant votes from your students in real-time.", href: "/dashboard/poll", color: "bg-sienna" },
   { icon: Brain, title: "Create Quiz", desc: "Build multiple-choice quizzes with auto-scoring and leaderboards.", href: "/dashboard/quiz", color: "bg-charcoal" },
   { icon: Cloud, title: "Word Cloud", desc: "Students submit words, see a live word cloud form in real-time.", href: "/dashboard/wordcloud", color: "bg-[#2563EB]" },
   { icon: MessageSquareText, title: "Exit Ticket", desc: "Quick end-of-class feedback to gauge student understanding.", href: "/dashboard/exit-ticket", color: "bg-[#16A34A]" },
-  { icon: PenTool, title: "Whiteboard", desc: "Freehand drawing, shapes, colors, and export.", href: "/dashboard/whiteboard", color: "bg-[#7C3AED]" },
-  { icon: Users, title: "Attendance", desc: "Track who joined each room session automatically.", href: "/dashboard/attendance", color: "bg-[#CA8A04]" },
+  { icon: PenTool, title: "Whiteboard", desc: "Freehand drawing, shapes, colors, and export. Save & share.", href: "/dashboard/whiteboard", color: "bg-[#7C3AED]" },
+  { icon: Users, title: "Attendance", desc: "Track who joined each room session automatically. Export CSV.", href: "/dashboard/attendance", color: "bg-[#CA8A04]" },
   { icon: BarChart3, title: "Analytics", desc: "View class-wide performance, engagement, and trends.", href: "/dashboard/analytics", color: "bg-[#06B6D4]" },
+  { icon: BookOpen, title: "Gradebook", desc: "Track student scores across quizzes with letter grades and CSV export.", href: "/dashboard/gradebook", color: "bg-[#EA580C]" },
+  { icon: UserSearch, title: "Students", desc: "View all students across your rooms with performance data.", href: "/dashboard/students", color: "bg-[#0891B2]" },
+  { icon: Layout, title: "Templates", desc: "Start from a professionally designed presentation template.", href: "/dashboard/templates", color: "bg-[#4F46E5]" },
 ];
 
 export default function ToolsPage() {

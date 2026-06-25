@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, GripVertical, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, GripVertical, Check, Loader2, Bookmark, BookmarkCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface QuizQuestion {
@@ -11,6 +11,15 @@ interface QuizQuestion {
   question: string;
   options: string[];
   correctIndex: number;
+}
+
+interface SavedQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+  category: string | null;
+  created_at: string;
 }
 
 export default function QuizCreatorPage() {
@@ -22,6 +31,9 @@ export default function QuizCreatorPage() {
   const [roomId, setRoomId] = useState("");
   const [rooms, setRooms] = useState<Array<{ id: string; name: string }>>([]);
   const [launching, setLaunching] = useState(false);
+  const [savedQuestions, setSavedQuestions] = useState<SavedQuestion[]>([]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const supabase = createClient();
 
   useEffect(() => {
@@ -30,6 +42,13 @@ export default function QuizCreatorPage() {
       if (!user) { router.push("/login"); return; }
       const { data } = await supabase.from("rooms").select("id, name").eq("teacher_id", user.id).eq("status", "active");
       if (data) setRooms(data);
+
+      const { data: bankData } = await supabase
+        .from("question_bank")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (bankData) setSavedQuestions(bankData);
     };
     fetchData();
   }, [supabase, router]);
@@ -48,6 +67,31 @@ export default function QuizCreatorPage() {
 
   const removeQuestion = (id: string) => {
     setQuestions(questions.filter((q) => q.id !== id));
+  };
+
+  const saveQuestion = async (q: QuizQuestion) => {
+    if (!q.question.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setSavingId(q.id);
+    const { data, error } = await supabase.from("question_bank").insert({
+      user_id: user.id,
+      question: q.question,
+      options: q.options,
+      correct_index: q.correctIndex,
+    }).select().single();
+    if (!error && data) {
+      setSavedIds((prev) => new Set(prev).add(q.id));
+      setSavedQuestions((prev) => [data, ...prev]);
+    }
+    setSavingId(null);
+  };
+
+  const addFromBank = (sq: SavedQuestion) => {
+    setQuestions([
+      ...questions,
+      { id: String(Date.now()), question: sq.question, options: sq.options, correctIndex: sq.correct_index },
+    ]);
   };
 
   const launchQuiz = async () => {
@@ -141,9 +185,19 @@ export default function QuizCreatorPage() {
                   ))}
                 </div>
               </div>
-              <button onClick={() => removeQuestion(q.id)} className="p-2 text-charcoal/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex flex-col items-center gap-1 pt-1">
+                <button
+                  onClick={() => saveQuestion(q)}
+                  disabled={savingId === q.id || savedIds.has(q.id) || !q.question.trim()}
+                  className="p-2 text-charcoal/20 hover:text-sienna opacity-0 group-hover:opacity-100 transition-all disabled:opacity-40"
+                  title="Save to question bank"
+                >
+                  {savedIds.has(q.id) ? <BookmarkCheck className="w-4 h-4 text-[#16A34A]" /> : <Bookmark className="w-4 h-4" />}
+                </button>
+                <button onClick={() => removeQuestion(q.id)} className="p-2 text-charcoal/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -155,6 +209,42 @@ export default function QuizCreatorPage() {
       >
         <Plus className="w-4 h-4" /> Add Question
       </button>
+
+      {savedQuestions.length > 0 && (
+        <div className="mt-12">
+          <h2 className="font-heading text-xl text-charcoal mb-4">Saved Questions</h2>
+          <div className="space-y-3">
+            {savedQuestions.map((sq) => (
+              <div key={sq.id} className="bg-white border border-border rounded-xl p-5 flex items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-charcoal mb-2">{sq.question}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {sq.options.map((opt, i) => (
+                      <span
+                        key={i}
+                        className={`text-xs px-2.5 py-1 rounded-lg ${
+                          i === sq.correct_index
+                            ? "bg-[#16A34A]/10 text-[#16A34A] font-medium"
+                            : "bg-charcoal/5 text-charcoal/50"
+                        }`}
+                      >
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                  {sq.category && <span className="text-[11px] text-charcoal/30 mt-2 inline-block">{sq.category}</span>}
+                </div>
+                <button
+                  onClick={() => addFromBank(sq)}
+                  className="shrink-0 flex items-center gap-1.5 bg-charcoal/5 border border-border rounded-lg px-3 py-2 text-xs font-medium text-charcoal hover:bg-sienna/10 hover:border-sienna/30 hover:text-sienna transition-all"
+                >
+                  <Plus className="w-3 h-3" /> Add to Quiz
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

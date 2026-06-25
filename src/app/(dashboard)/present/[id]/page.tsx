@@ -60,6 +60,10 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
   const [handRaises, setHandRaises] = useState<{ student_id: string; student_name: string }[]>([]);
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; x: number }[]>([]);
   const [attentionMode, setAttentionMode] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickedStudent, setPickedStudent] = useState<string | null>(null);
+  const [pickerSpinning, setPickerSpinning] = useState(false);
+  const [studentList, setStudentList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const toolbarTimer = useRef<NodeJS.Timeout | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -88,6 +92,13 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
 
         const { count } = await supabase.from("room_participants").select("*", { count: "exact", head: true }).eq("room_id", roomData.id);
         setStudents(count || 0);
+
+        const { data: participants } = await supabase.from("room_participants").select("student_id").eq("room_id", roomData.id);
+        if (participants && participants.length > 0) {
+          const sIds = participants.map((p: { student_id: string }) => p.student_id);
+          const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", sIds);
+          if (profiles) setStudentList(profiles.map((p: any) => ({ id: p.id, name: p.full_name || "Student" })));
+        }
 
         const channel = supabase.channel(`presenter-${roomData.id}`);
 
@@ -284,6 +295,33 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  const pickRandomStudent = () => {
+    if (studentList.length === 0) return;
+    setPickerSpinning(true);
+    setPickedStudent(null);
+    let count = 0;
+    const interval = setInterval(() => {
+      const random = studentList[Math.floor(Math.random() * studentList.length)];
+      setPickedStudent(random.name);
+      count++;
+      if (count > 20) {
+        clearInterval(interval);
+        const final = studentList[Math.floor(Math.random() * studentList.length)];
+        setPickedStudent(final.name);
+        setPickerSpinning(false);
+      }
+    }, 100);
+  };
+
+  const broadcastTimer = async (seconds: number, running: boolean) => {
+    if (room) {
+      await supabase.from("rooms").update({
+        timer_seconds: seconds,
+        timer_end: running ? new Date(Date.now() + seconds * 1000).toISOString() : null,
+      }).eq("id", room.id);
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-charcoal flex items-center justify-center"><Loader2 className="w-6 h-6 text-white/40 animate-spin" /></div>;
   }
@@ -343,6 +381,9 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
             </button>
             <button onClick={() => setShowReactions(!showReactions)} className="p-2.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-all" title="Reactions">
               <SmilePlus className="w-4 h-4" />
+            </button>
+            <button onClick={() => { setShowPicker(true); pickRandomStudent(); }} className="p-2.5 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-all" title="Random Student Picker">
+              <Users className="w-4 h-4" />
             </button>
             <div className="w-px h-6 bg-white/20 mx-1" />
             <button onClick={sendAttentionCheck} className="p-2.5 text-white/50 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all" title="Attention Check">
@@ -461,16 +502,16 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
         <div className="fixed bottom-20 left-6 bg-white rounded-2xl shadow-2xl p-5 z-[120]">
           <div className="text-4xl font-mono text-charcoal text-center mb-3">{formatTime(timerSeconds)}</div>
           <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setTimerRunning(!timerRunning)}
+            <button onClick={() => { const newRunning = !timerRunning; setTimerRunning(newRunning); broadcastTimer(timerSeconds, newRunning); }}
               className={`flex-1 text-xs py-2 rounded-lg font-medium transition-all ${timerRunning ? "bg-red-500 text-white" : "bg-sienna text-white hover:bg-sienna-dark"}`}>
               {timerRunning ? "Pause" : "Start"}
             </button>
-            <button onClick={() => { setTimerRunning(false); setTimerSeconds(300); }}
+            <button onClick={() => { setTimerRunning(false); setTimerSeconds(300); broadcastTimer(300, false); }}
               className="flex-1 text-xs py-2 rounded-lg font-medium bg-charcoal/5 text-charcoal/60 hover:bg-charcoal/10 transition-all">Reset</button>
           </div>
           <div className="flex gap-1.5">
             {[60, 120, 300, 600].map((s) => (
-              <button key={s} onClick={() => { setTimerSeconds(s); setTimerRunning(false); }}
+              <button key={s} onClick={() => { setTimerSeconds(s); setTimerRunning(false); broadcastTimer(s, false); }}
                 className="flex-1 text-[10px] py-1 bg-charcoal/5 rounded text-charcoal/40 hover:bg-charcoal/10 transition-all">
                 {s >= 60 ? `${s / 60}m` : `${s}s`}
               </button>
@@ -541,6 +582,40 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
             }}
               className="text-2xl hover:scale-125 transition-transform">{emoji}</button>
           ))}
+        </div>
+      )}
+
+      {/* Random Student Picker */}
+      {showPicker && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[200]" onClick={() => { if (!pickerSpinning) setShowPicker(false); }}>
+          <div className="bg-white rounded-3xl p-8 w-96 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-xl text-charcoal mb-6">Random Student Picker</h3>
+            {studentList.length === 0 ? (
+              <p className="text-sm text-charcoal/40 mb-6">No students in this room yet.</p>
+            ) : (
+              <>
+                <div className={`w-32 h-32 rounded-full mx-auto mb-6 flex items-center justify-center text-2xl font-heading transition-all ${
+                  pickerSpinning ? "bg-sienna/20 animate-spin" : "bg-sienna/10"
+                }`}>
+                  <span className={`text-4xl font-heading text-sienna ${pickerSpinning ? "animate-pulse" : ""}`}>
+                    {pickedStudent ? pickedStudent.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "?"}
+                  </span>
+                </div>
+                {pickedStudent && !pickerSpinning && (
+                  <div className="mb-6">
+                    <div className="text-2xl font-heading text-charcoal mb-1">{pickedStudent}</div>
+                    <div className="text-xs text-charcoal/40">{studentList.length} students in room</div>
+                  </div>
+                )}
+                <button onClick={pickRandomStudent} disabled={pickerSpinning}
+                  className="w-full bg-sienna text-white text-sm font-medium py-3 rounded-xl hover:bg-sienna-dark transition-all disabled:opacity-50">
+                  {pickerSpinning ? "Picking..." : "Pick Again"}
+                </button>
+              </>
+            )}
+            <button onClick={() => { if (!pickerSpinning) setShowPicker(false); }}
+              className="w-full mt-3 text-xs text-charcoal/40 hover:text-charcoal/60 transition-colors">Close</button>
+          </div>
         </div>
       )}
 

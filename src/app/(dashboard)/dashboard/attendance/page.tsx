@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Calendar } from "lucide-react";
+import { ArrowLeft, Users, Calendar, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { downloadCSV } from "@/lib/export";
 
 interface RoomAttendance {
   room_id: string;
@@ -43,8 +44,20 @@ export default function AttendancePage() {
       <Link href="/dashboard/tools" className="inline-flex items-center gap-2 text-sm text-charcoal/40 hover:text-charcoal/60 mb-8 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to tools
       </Link>
-      <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">Attendance</h1>
-      <p className="text-sm text-charcoal/45 mb-8">Track student attendance across all sessions.</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">Attendance</h1>
+          <p className="text-sm text-charcoal/45">Track student attendance across all sessions.</p>
+        </div>
+        {attendance.length > 0 && (
+          <button onClick={() => downloadCSV(attendance.map((a) => ({
+            Room: a.room_name, Date: new Date(a.created_at).toLocaleDateString(), "Student Count": a.count,
+          })), "attendance.csv")}
+            className="flex items-center gap-2 bg-charcoal text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-charcoal-light transition-all">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12"><Calendar className="w-8 h-8 text-charcoal/20 animate-pulse" /></div>

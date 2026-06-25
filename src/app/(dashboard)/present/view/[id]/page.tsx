@@ -51,9 +51,11 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
   const [quizTimeLeft, setQuizTimeLeft] = useState(0);
-  const [leaderboard, setLeaderboard] = useState<{ student_name: string; score: number }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ student_name: string; score: number; totalPoints: number }[]>([]);
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; x: number }[]>([]);
   const [attentionPopup, setAttentionPopup] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -95,9 +97,20 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
         // Slide sync
         channel.on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms", filter: `id=eq.${roomData.id}` },
           (payload) => {
-            const updated = payload.new as { current_slide?: number; status?: string };
+            const updated = payload.new as { current_slide?: number; status?: string; timer_end?: string; timer_seconds?: number };
             if (updated.current_slide !== undefined) setCurrentSlide(updated.current_slide);
             if (updated.status === "ended") { window.location.href = "/dashboard/student"; }
+            if (updated.timer_end) {
+              const end = new Date(updated.timer_end).getTime();
+              const now = Date.now();
+              if (end > now) {
+                setTimerSeconds(Math.ceil((end - now) / 1000));
+                setTimerRunning(true);
+              }
+            } else if (updated.timer_end === null) {
+              setTimerRunning(false);
+              if (updated.timer_seconds !== undefined) setTimerSeconds(updated.timer_seconds);
+            }
           }
         );
 
@@ -161,6 +174,15 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
     params.then((p) => init(p.id));
   }, [params, supabase]);
 
+  // Room timer countdown
+  useEffect(() => {
+    if (!timerRunning || timerSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setTimerSeconds((s) => { if (s <= 1) { setTimerRunning(false); return 0; } return s - 1; });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timerRunning]);
+
   // Quiz timer
   useEffect(() => {
     if (quizTimeLeft <= 0 || quizSubmitted || !activeQuiz) return;
@@ -192,6 +214,7 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from("poll_votes").upsert({ poll_id: activePoll.id, student_id: user.id, option_index: optionIndex }, { onConflict: "poll_id,student_id" });
+    fetch("/api/points", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: user.id, room_id: roomId, points: 10, reason: "Poll participation" }) });
     // Fetch results
     const { data: votes } = await supabase.from("poll_votes").select("option_index").eq("poll_id", activePoll.id);
     if (votes) {
@@ -242,12 +265,21 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
     if (data) {
       setQuizScore(data.score);
       setQuizSubmitted(true);
+      // Award points based on score
+      const pct = (data.score / 100);
+      const pts = pct >= 0.9 ? 100 : pct >= 0.7 ? 75 : pct >= 0.5 ? 50 : 25;
+      fetch("/api/points", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: user.id, room_id: roomId, points: pts, reason: `Quiz: ${activeQuiz.title}` }) });
       // Fetch leaderboard
       const { data: responses } = await supabase.from("quiz_responses").select("score, student_id").eq("quiz_id", activeQuiz.id).order("score", { ascending: false }).limit(10);
       if (responses) {
+        const { data: pointsData } = await fetch("/api/points").then((r) => r.json()).catch(() => ({ leaderboard: [] }));
+        const pointsMap = new Map<string, number>();
+        for (const entry of (pointsData?.leaderboard ?? []) as { student_id: string; total_points: number }[]) {
+          pointsMap.set(entry.student_id, entry.total_points);
+        }
         const lb = await Promise.all(responses.map(async (r) => {
           const { data: p } = await supabase.from("profiles").select("full_name").eq("id", r.student_id).single();
-          return { student_name: p?.full_name || "Student", score: r.score || 0 };
+          return { student_name: p?.full_name || "Student", score: r.score || 0, totalPoints: pointsMap.get(r.student_id) || 0 };
         }));
         setLeaderboard(lb);
       }
@@ -277,6 +309,17 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
             <h1 className="font-heading text-4xl text-white mb-2">ATTENTION!</h1>
             <p className="text-lg text-white/80">Please look at the screen</p>
           </div>
+        </div>
+      )}
+
+      {/* Floating timer */}
+      {timerRunning && timerSeconds > 0 && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[140] px-6 py-3 rounded-2xl shadow-2xl ${
+          timerSeconds <= 10 ? "bg-red-500 animate-pulse" : "bg-white"
+        }`}>
+          <span className={`font-mono text-3xl font-bold ${timerSeconds <= 10 ? "text-white" : "text-charcoal"}`}>
+            {Math.floor(timerSeconds / 60)}:{(timerSeconds % 60).toString().padStart(2, "0")}
+          </span>
         </div>
       )}
 
@@ -441,6 +484,7 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
                       {i + 1}
                     </span>
                     <span className="flex-1 text-sm text-charcoal">{entry.student_name}</span>
+                    <span className="text-xs text-charcoal/40 font-medium">Total XP: {entry.totalPoints}</span>
                     <span className="text-sm font-medium text-charcoal/60">{entry.score} pts</span>
                   </div>
                 ))}

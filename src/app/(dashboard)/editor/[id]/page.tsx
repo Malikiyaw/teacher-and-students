@@ -7,9 +7,10 @@ import {
   Plus, Trash2, Type, Image, Square, Palette, ChevronDown,
   Undo2, Redo2, Play, Share2, Save, ArrowLeft, MousePointer2,
   Loader2, Copy, ArrowUp, ArrowDown, StickyNote, Settings,
-  Code, Minus,
+  Code, Minus, Download, Globe, History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { presentationToHTML, downloadHTML } from "@/lib/export";
 
 interface SlideElement {
   id: string;
@@ -86,6 +87,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [versionHistory, setVersionHistory] = useState<{ slides: Slide[]; title: string; saved_at: string }[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
 
   const currentSlide = slides[activeSlide];
 
@@ -233,6 +237,35 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     saveTimerRef.current = setTimeout(autoSave, 2000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [slides, title, autoSave]);
+
+  const exportHTML = () => {
+    const html = presentationToHTML(slides, title);
+    downloadHTML(html, `${title.replace(/[^a-z0-9]/gi, "_")}.html`);
+  };
+
+  const saveVersion = async () => {
+    if (presentationId === "new") return;
+    const newVersion = { slides: JSON.parse(JSON.stringify(slides)), title, saved_at: new Date().toISOString() };
+    const updated = [newVersion, ...versionHistory].slice(0, 10);
+    setVersionHistory(updated);
+    await supabase.from("presentations").update({ version_history: updated }).eq("id", presentationId);
+  };
+
+  const restoreVersion = (index: number) => {
+    const version = versionHistory[index];
+    if (version) {
+      setSlides(version.slides);
+      setTitle(version.title);
+      setShowVersions(false);
+    }
+  };
+
+  const togglePublic = async () => {
+    if (presentationId === "new") return;
+    const newPublic = !isPublic;
+    setIsPublic(newPublic);
+    await supabase.from("presentations").update({ is_public: newPublic }).eq("id", presentationId);
+  };
 
   const addSlide = (layout?: typeof layoutPresets[number]) => {
     const newSlide: Slide = {
@@ -402,8 +435,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           {saving && <span className="text-[11px] text-white/30 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
           {!saving && lastSaved && <span className="text-[11px] text-white/30">Saved</span>}
           <button onClick={autoSave} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Save className="w-4 h-4" /></button>
+          <button onClick={exportHTML} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Export HTML"><Download className="w-4 h-4" /></button>
+          <button onClick={saveVersion} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Save Version"><History className="w-4 h-4" /></button>
           <button onClick={generateShareLink} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Share2 className="w-4 h-4" /></button>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Settings className="w-4 h-4" /></button>
+          <button onClick={togglePublic} className={`p-2 rounded-lg transition-all ${isPublic ? "text-sienna bg-sienna/10" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title={isPublic ? "Public - Click to make private" : "Private - Click to make public"}>
+            <Globe className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowVersions(!showVersions)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Version History"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-white/10 mx-1" />
           <Link href={`/present/${presentationId}`}
             className="flex items-center gap-2 text-xs font-medium text-white bg-sienna px-4 py-1.5 rounded-lg hover:bg-sienna-dark transition-all duration-300">
@@ -692,6 +730,31 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <option value="zoom">Zoom</option>
             </select>
             <button onClick={() => setShowSettings(false)} className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* Version History modal */}
+      {showVersions && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowVersions(false)}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Version History</h3>
+            {versionHistory.length === 0 ? (
+              <p className="text-xs text-white/30 text-center py-6">No saved versions yet. Click the history icon in the toolbar to save a version.</p>
+            ) : (
+              <div className="space-y-2">
+                {versionHistory.map((v, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors">
+                    <div>
+                      <div className="text-xs text-white/70">{v.title}</div>
+                      <div className="text-[10px] text-white/30">{new Date(v.saved_at).toLocaleString()} — {v.slides.length} slides</div>
+                    </div>
+                    <button onClick={() => restoreVersion(i)} className="text-[11px] text-sienna hover:text-sienna/80 transition-colors">Restore</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowVersions(false)} className="w-full mt-4 text-xs text-white/40 hover:text-white/60 transition-colors">Close</button>
           </div>
         </div>
       )}

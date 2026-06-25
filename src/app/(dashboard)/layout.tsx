@@ -15,6 +15,9 @@ import {
   X,
   Plus,
   PenTool,
+  Bell,
+  BookOpen,
+  UserSearch,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +26,8 @@ const navItems = [
   { href: "/dashboard/presentations", label: "Presentations", icon: Presentation },
   { href: "/dashboard/rooms", label: "Rooms", icon: Users },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/dashboard/gradebook", label: "Gradebook", icon: BookOpen },
+  { href: "/dashboard/students", label: "Students", icon: UserSearch },
   { href: "/dashboard/files", label: "Files", icon: FolderOpen },
   { href: "/dashboard/tools", label: "Classroom Tools", icon: PenTool },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -42,6 +47,8 @@ export default function DashboardLayout({
     role: string;
     plan: string;
   } | null>(null);
+  const [notifications, setNotifications] = useState<{ id: string; title: string; content: string; link: string; read: boolean }[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   useEffect(() => {
@@ -61,6 +68,14 @@ export default function DashboardLayout({
         .single();
 
       if (data) setProfile(data);
+
+      const { data: notifs } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (notifs) setNotifications(notifs);
     };
     fetchProfile();
   }, [router]);
@@ -202,6 +217,38 @@ export default function DashboardLayout({
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
+            <div className="relative">
+              <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 text-charcoal/40 hover:text-charcoal/60 transition-colors">
+                <Bell className="w-4 h-4" />
+                {notifications.filter((n) => !n.read).length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-sienna text-[9px] text-white rounded-full flex items-center justify-center">
+                    {notifications.filter((n) => !n.read).length}
+                  </span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="text-sm font-medium text-charcoal">Notifications</span>
+                    {notifications.some((n) => !n.read) && (
+                      <button onClick={async () => {
+                        const supabase = createClient();
+                        await supabase.from("notifications").update({ read: true }).eq("user_id", (await supabase.auth.getUser()).data.user?.id || "").eq("read", false);
+                        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                      }} className="text-[11px] text-sienna hover:text-sienna/80 transition-colors">Mark all read</button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-xs text-charcoal/30">No notifications yet</div>
+                  ) : notifications.map((n) => (
+                    <div key={n.id} className={`px-4 py-3 border-b border-border/50 hover:bg-cream/50 transition-colors ${!n.read ? "bg-sienna/5" : ""}`}>
+                      <div className="text-sm text-charcoal font-medium">{n.title}</div>
+                      {n.content && <div className="text-xs text-charcoal/50 mt-0.5">{n.content}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <span className={`text-xs px-3 py-1 rounded-full font-medium ${
               profile?.plan === "pro"
                 ? "bg-sienna/10 text-sienna"

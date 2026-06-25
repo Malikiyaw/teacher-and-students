@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Users, Clock, Copy, Check } from "lucide-react";
+import { Plus, Users, Clock, Copy, Check, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Room {
@@ -130,6 +130,12 @@ export default function RoomsPage() {
                         {copied === room.code ? <Check className="w-3.5 h-3.5 text-[#16A34A]" /> : <Copy className="w-3.5 h-3.5 text-charcoal/30" />}
                       </button>
                       <Link
+                        href={`/dashboard/rooms/${room.id}`}
+                        className="flex items-center gap-1.5 bg-charcoal/5 border border-border rounded-lg px-3 py-2 text-xs font-medium text-charcoal hover:border-charcoal/20 transition-all duration-200"
+                      >
+                        <BarChart3 className="w-3 h-3" /> Stats
+                      </Link>
+                      <Link
                         href={`/present/${room.id}`}
                         className="bg-sienna text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-sienna-dark transition-all duration-300"
                       >
@@ -156,6 +162,12 @@ export default function RoomsPage() {
                       <div className="text-xs text-charcoal/40">{room._count} students attended</div>
                     </div>
                     <div className="flex items-center gap-3">
+                      <Link
+                        href={`/dashboard/rooms/${room.id}`}
+                        className="flex items-center gap-1.5 text-xs text-charcoal/40 hover:text-sienna transition-colors"
+                      >
+                        <BarChart3 className="w-3 h-3" /> Stats
+                      </Link>
                       <span className="text-xs text-charcoal/30 font-mono">{room.code}</span>
                       <span className="text-xs text-charcoal/30">{getTimeAgo(room.created_at)}</span>
                     </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Presentation, Clock, Trash2, Search } from "lucide-react";
+import { Plus, Presentation, Clock, Trash2, Search, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface PresentationItem {
@@ -43,6 +43,35 @@ export default function PresentationsPage() {
     if (!confirm("Delete this presentation?")) return;
     await supabase.from("presentations").delete().eq("id", id);
     setPresentations((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleDuplicate = async (pres: PresentationItem) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: full } = await supabase
+      .from("presentations")
+      .select("*")
+      .eq("id", pres.id)
+      .single();
+    if (!full) return;
+
+    const { id: _oldId, ...rest } = full;
+    const { data: newPres, error } = await supabase
+      .from("presentations")
+      .insert({
+        ...rest,
+        title: `Copy of ${pres.title}`,
+        user_id: user.id,
+        status: "draft",
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (!error && newPres) {
+      setPresentations((prev) => [newPres as PresentationItem, ...prev]);
+    }
   };
 
   const getTimeAgo = (dateStr: string) => {
@@ -120,6 +149,12 @@ export default function PresentationsPage() {
                     </span>
                   </div>
                 </Link>
+                <button
+                  onClick={() => handleDuplicate(pres)}
+                  className="p-2 text-charcoal/20 hover:text-sienna opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-sienna/10"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => handleDelete(pres.id)}
                   className="p-2 text-charcoal/20 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-red-50"

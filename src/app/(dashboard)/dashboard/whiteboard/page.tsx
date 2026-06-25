@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
   Pen,
@@ -14,6 +15,8 @@ import {
   Trash2,
   Download,
   Users,
+  Save,
+  FolderOpen,
 } from "lucide-react";
 
 type Tool = "pen" | "eraser" | "rect" | "circle" | "text";
@@ -47,6 +50,14 @@ export default function WhiteboardPage() {
   const [actions, setActions] = useState<DrawAction[]>([]);
   const [redoStack, setRedoStack] = useState<DrawAction[]>([]);
   const [shapeStart, setShapeStart] = useState<Point | null>(null);
+  const [whiteboardId, setWhiteboardId] = useState<string | null>(null);
+  const [whiteboardName, setWhiteboardName] = useState("Untitled Whiteboard");
+  const [savedWhiteboards, setSavedWhiteboards] = useState<
+    { id: string; name: string; created_at: string }[]
+  >([]);
+  const [showLoadMenu, setShowLoadMenu] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const loadMenuRef = useRef<HTMLDivElement>(null);
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -228,6 +239,75 @@ export default function WhiteboardPage() {
     setRedoStack([]);
   };
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (loadMenuRef.current && !loadMenuRef.current.contains(e.target as Node)) {
+        setShowLoadMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const fetchWhiteboards = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("whiteboards")
+      .select("id, name, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    setSavedWhiteboards(data ?? []);
+  };
+
+  const saveWhiteboard = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      if (whiteboardId) {
+        await supabase
+          .from("whiteboards")
+          .update({ name: whiteboardName, actions })
+          .eq("id", whiteboardId);
+      } else {
+        const { data } = await supabase
+          .from("whiteboards")
+          .insert({ user_id: user.id, name: whiteboardName, actions })
+          .select("id")
+          .single();
+        if (data) setWhiteboardId(data.id);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadWhiteboard = async (id: string) => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("whiteboards")
+      .select("id, name, actions")
+      .eq("id", id)
+      .single();
+    if (data) {
+      setWhiteboardId(data.id);
+      setWhiteboardName(data.name);
+      setActions(data.actions ?? []);
+      setRedoStack([]);
+      setShowLoadMenu(false);
+    }
+  };
+
+  const newWhiteboard = () => {
+    setWhiteboardId(null);
+    setWhiteboardName("Untitled Whiteboard");
+    setActions([]);
+    setRedoStack([]);
+  };
+
   const download = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -276,6 +356,56 @@ export default function WhiteboardPage() {
             className="p-2 text-white/40 hover:text-white/70 transition-colors"
           >
             <Download className="w-4 h-4" />
+          </button>
+          <div className="w-px h-5 bg-white/10 mx-1" />
+          <button
+            onClick={newWhiteboard}
+            className="px-2.5 py-1 text-xs text-white/60 hover:text-white/80 hover:bg-white/5 rounded transition-colors"
+          >
+            New
+          </button>
+          <div className="relative" ref={loadMenuRef}>
+            <button
+              onClick={() => { fetchWhiteboards(); setShowLoadMenu((v) => !v); }}
+              className="p-2 text-white/40 hover:text-white/70 transition-colors"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+            {showLoadMenu && (
+              <div className="absolute right-0 top-full mt-1 w-64 bg-[#2A2523] border border-white/10 rounded-lg shadow-xl z-50 max-h-72 overflow-y-auto">
+                {savedWhiteboards.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-white/40">No saved whiteboards</div>
+                ) : (
+                  savedWhiteboards.map((wb) => (
+                    <button
+                      key={wb.id}
+                      onClick={() => loadWhiteboard(wb.id)}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors ${
+                        wb.id === whiteboardId ? "text-sienna" : "text-white/70"
+                      }`}
+                    >
+                      <div className="font-medium truncate">{wb.name}</div>
+                      <div className="text-xs text-white/30 mt-0.5">
+                        {new Date(wb.created_at).toLocaleDateString()}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <input
+            type="text"
+            value={whiteboardName}
+            onChange={(e) => setWhiteboardName(e.target.value)}
+            className="w-44 px-2 py-1 text-xs bg-transparent border border-white/10 rounded text-white/70 focus:border-white/20 focus:outline-none"
+          />
+          <button
+            onClick={saveWhiteboard}
+            disabled={isSaving}
+            className="p-2 text-white/40 hover:text-sienna transition-colors disabled:opacity-40"
+          >
+            <Save className="w-4 h-4" />
           </button>
         </div>
       </div>

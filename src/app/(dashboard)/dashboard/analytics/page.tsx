@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, TrendingUp, Users, Clock } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Clock, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AnalyticsPage() {
@@ -16,6 +16,12 @@ export default function AnalyticsPage() {
   const [topPresentations, setTopPresentations] = useState<Array<{
     title: string;
     updated_at: string;
+  }>>([]);
+  const [leaderboard, setLeaderboard] = useState<Array<{
+    rank: number;
+    name: string;
+    total_score: number;
+    quizzes_taken: number;
   }>>([]);
   const supabase = createClient();
 
@@ -50,6 +56,45 @@ export default function AnalyticsPage() {
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(5);
+
+      if (roomIds.length > 0) {
+        const { data: quizIds } = await supabase
+          .from("quizzes").select("id").in("room_id", roomIds);
+        const qIds = quizIds?.map((q: { id: string }) => q.id) || [];
+        if (qIds.length > 0) {
+          const { data: responses } = await supabase
+            .from("quiz_responses")
+            .select("student_id, score")
+            .in("quiz_id", qIds);
+          if (responses && responses.length > 0) {
+            const studentMap = new Map<string, { total: number; count: number }>();
+            for (const r of responses as { student_id: string; score: number }[]) {
+              const prev = studentMap.get(r.student_id) || { total: 0, count: 0 };
+              studentMap.set(r.student_id, { total: prev.total + (r.score || 0), count: prev.count + 1 });
+            }
+            const studentIds = Array.from(studentMap.keys());
+            const { data: profiles } = await supabase
+              .from("profiles").select("id, name").in("id", studentIds);
+            const profileMap = new Map<string, string>();
+            if (profiles) {
+              for (const p of profiles as { id: string; name: string }[]) {
+                profileMap.set(p.id, p.name);
+              }
+            }
+            const lb = Array.from(studentMap.entries())
+              .map(([sid, v]) => ({
+                rank: 0,
+                name: profileMap.get(sid) || "Unknown",
+                total_score: v.total,
+                quizzes_taken: v.count,
+              }))
+              .sort((a, b) => b.total_score - a.total_score)
+              .slice(0, 10)
+              .map((item, i) => ({ ...item, rank: i + 1 }));
+            setLeaderboard(lb);
+          }
+        }
+      }
 
       setStats({
         totalPresentations: presCount || 0,
@@ -107,6 +152,37 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="bg-white border border-border rounded-xl mt-8">
+        <div className="px-6 py-4 border-b border-border flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-sienna" />
+          <h2 className="font-heading text-xl text-charcoal">Top Students</h2>
+        </div>
+        {leaderboard.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-charcoal/40">No quiz data yet</div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left text-xs font-medium text-charcoal/40 px-6 py-3">Rank</th>
+                <th className="text-left text-xs font-medium text-charcoal/40 px-6 py-3">Student</th>
+                <th className="text-right text-xs font-medium text-charcoal/40 px-6 py-3">Total Score</th>
+                <th className="text-right text-xs font-medium text-charcoal/40 px-6 py-3">Quizzes Taken</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {leaderboard.map((student) => (
+                <tr key={student.rank} className="hover:bg-charcoal/[0.02] transition-colors">
+                  <td className="px-6 py-4 font-heading text-lg text-charcoal/15">{student.rank}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-charcoal">{student.name}</td>
+                  <td className="px-6 py-4 text-sm text-charcoal text-right">{student.total_score}</td>
+                  <td className="px-6 py-4 text-sm text-charcoal/40 text-right">{student.quizzes_taken}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

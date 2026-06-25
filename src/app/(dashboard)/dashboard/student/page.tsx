@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Clock } from "lucide-react";
+import { Users, Clock, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function StudentDashboard() {
@@ -12,6 +12,7 @@ export default function StudentDashboard() {
   const [joinError, setJoinError] = useState("");
   const [joinedRoom, setJoinedRoom] = useState<{ name: string; code: string } | null>(null);
   const [myRooms, setMyRooms] = useState<Array<{ id: string; name: string; code: string; created_at: string }>>([]);
+  const [totalPoints, setTotalPoints] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -31,6 +32,10 @@ export default function StudentDashboard() {
         const rooms = participations.map((p) => (p as unknown as { rooms: { id: string; name: string; code: string; created_at: string } }).rooms).filter(Boolean);
         setMyRooms(rooms);
       }
+
+      const pointsRes = await fetch("/api/points").then((r) => r.json()).catch(() => ({ leaderboard: [] }));
+      const myEntry = (pointsRes?.leaderboard ?? []).find((e: { student_id: string; total_points: number }) => e.student_id === user.id);
+      setTotalPoints(myEntry?.total_points || 0);
     };
     fetchData();
   }, [supabase, router]);
@@ -74,6 +79,19 @@ export default function StudentDashboard() {
         <p className="text-sm text-charcoal/45">
           You&apos;re enrolled in {myRooms.length} class{myRooms.length !== 1 ? "es" : ""}.
         </p>
+      </div>
+
+      {/* Total Points */}
+      <div className="mb-10">
+        <div className="bg-white border border-border rounded-xl p-5 flex items-center gap-4 max-w-sm">
+          <div className="w-12 h-12 bg-sienna/10 rounded-xl flex items-center justify-center">
+            <Trophy className="w-6 h-6 text-sienna" />
+          </div>
+          <div>
+            <p className="text-xs text-charcoal/40 font-medium">Total Points</p>
+            <p className="text-2xl font-heading text-charcoal">{totalPoints}</p>
+          </div>
+        </div>
       </div>
 
       {/* Join Room */}
