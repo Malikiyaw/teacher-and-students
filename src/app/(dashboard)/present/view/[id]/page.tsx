@@ -7,6 +7,10 @@ import {
   SmilePlus, StickyNote, Clock, Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
+
+const transitionStyles = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes zoomIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}.animate-fadeIn{animation:fadeIn .5s ease-out}.animate-slideIn{animation:slideIn .4s ease-out}.animate-zoomIn{animation:zoomIn .4s ease-out}`;
 
 interface SlideElement {
   id: string;
@@ -17,12 +21,39 @@ interface SlideElement {
   height?: number;
   content: string;
   color: string;
+  alt?: string;
+  fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
   fontStyle?: string;
+  textDecoration?: string;
+  textAlign?: string;
   borderRadius?: number;
+  codeLanguage?: string;
+  shapeId?: string;
+  chartType?: string;
+  iconId?: string;
+  qrContent?: string;
+  qrData?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeDash?: string;
+  shadow?: string;
+  flipH?: boolean;
+  flipV?: boolean;
+  gradient?: string;
+  crop?: { x: number; y: number; width: number; height: number };
+  highlight?: string;
+  groupId?: string;
+  lineEndX?: number;
+  lineEndY?: number;
+  arrowStart?: string;
+  arrowEnd?: string;
+  tableRows?: number;
+  tableCols?: number;
+  tableData?: string[][];
 }
-interface Slide { id: string; background: string; elements: SlideElement[]; notes?: string; }
+interface Slide { id: string; background: string; backgroundImage?: string; backgroundGradient?: string; showSlideNumber?: boolean; section?: string; elements: SlideElement[]; notes?: string; transition?: string; }
 
 const reactionEmojis = ["👍", "❤️", "😮", "🔥", "👏", "💡"];
 
@@ -173,6 +204,14 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
     };
     params.then((p) => init(p.id));
   }, [params, supabase]);
+
+  // Inject transition keyframes
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = transitionStyles;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
 
   // Room timer countdown
   useEffect(() => {
@@ -357,23 +396,61 @@ export default function StudentViewPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* Main slide area */}
+      {/* Main slide area with transitions */}
       <div className="flex-1 flex items-center justify-center p-4">
         {slide ? (
-          <div className="w-full max-w-4xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg" style={{ background: slide.background }}>
+          <div key={currentSlide} className={`w-full max-w-4xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg ${
+            slide.transition === "fade" ? "animate-fadeIn" :
+            slide.transition === "slide" ? "animate-slideIn" :
+            slide.transition === "zoom" ? "animate-zoomIn" : ""
+          }`}
+            style={{ background: slide.backgroundGradient || (slide.backgroundImage ? `url(${slide.backgroundImage}) center/cover` : slide.background) }}>
+            {slide.showSlideNumber && <div className="absolute bottom-2 right-3 text-[10px] text-white/30 pointer-events-none z-50">{currentSlide + 1}</div>}
             {(slide.elements || []).map((el) => (
               <div key={el.id} className="absolute"
-                style={{ left: el.x ?? 0, top: el.y ?? 0, width: el.width ?? 200, height: el.height ?? 40 }}>
+                style={{ left: el.x ?? 0, top: el.y ?? 0, width: el.width ?? 200, height: el.height ?? 40, boxShadow: el.shadow, transform: `${el.flipH ? " scaleX(-1)" : ""}${el.flipV ? " scaleY(-1)" : ""}`, borderRadius: el.borderRadius || 0 }}>
                 {el.type === "text" ? (
-                  <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}>
+                  <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle, textDecoration: el.textDecoration, textAlign: el.textAlign as any, backgroundColor: el.highlight || undefined, padding: "2px 4px", borderRadius: el.borderRadius || 0 }}>
                     {el.content}
                   </div>
                 ) : el.type === "code" ? (
-                  <div className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 font-mono text-xs text-green-400 border border-white/10 overflow-auto" style={{ whiteSpace: "pre" }}>{el.content}</div>
+                  <div className="w-full h-full bg-[#1E1E1E] rounded-lg overflow-auto border border-white/10">
+                    <pre className="p-3 m-0 font-mono text-xs overflow-auto" style={{ whiteSpace: "pre" }}><code className={`language-${el.codeLanguage || "plaintext"}`}
+                      dangerouslySetInnerHTML={{ __html: hljs.highlight(el.content, { language: el.codeLanguage || "plaintext", ignoreIllegals: true }).value }} /></pre>
+                  </div>
                 ) : el.type === "image" ? (
-                  <img src={el.content} alt="" className="w-full h-full object-cover rounded" draggable={false} />
+                  el.crop ? (
+                    <div className="w-full h-full overflow-hidden rounded" style={{ borderRadius: el.borderRadius || 0 }}>
+                      <img src={el.content} alt={el.alt || ""} className="absolute" draggable={false} style={{ left: -el.crop.x, top: -el.crop.y, width: el.crop.width, height: el.crop.height, objectFit: "none" }} />
+                    </div>
+                  ) : (
+                    <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} style={{ borderRadius: el.borderRadius || 0 }} />
+                  )
+                ) : el.type === "youtube" ? (
+                  <iframe src={el.content} className="w-full h-full rounded" allowFullScreen style={{ borderRadius: el.borderRadius || 0 }} />
+                ) : el.type === "line" ? (
+                  <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="0" y1="0" x2={(el.lineEndX || el.width || 200) - (el.x || 0)} y2={(el.lineEndY || el.height || 3) - (el.y || 0)}
+                      stroke={el.strokeColor || el.color} strokeWidth={el.strokeWidth || 3}
+                      strokeDasharray={el.strokeDash || undefined} />
+                  </svg>
+                ) : el.type === "table" ? (
+                  <table className="w-full h-full border-collapse text-xs" style={{ color: el.color }}>
+                    <tbody>{(el.tableData || Array.from({ length: el.tableRows || 3 }, () => Array(el.tableCols || 3).fill("") as string[])).map((row: string[], ri: number) => (
+                      <tr key={ri}>{row.map((cell: string, ci: number) => (
+                        <td key={ci} className="border border-white/20 px-2 py-1">{cell}</td>
+                      ))}</tr>
+                    ))}</tbody>
+                  </table>
+                ) : el.type === "shape" && (el.iconId || el.chartType || el.qrData || el.shapeId) ? (
+                  <div className="w-full h-full flex items-center justify-center rounded" style={{ background: el.gradient || "transparent", borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }}>
+                    {el.qrData ? <div dangerouslySetInnerHTML={{ __html: el.qrData }} /> :
+                     el.iconId ? <svg width={el.width} height={el.height} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d={el.content} fill={el.color} /></svg> :
+                     el.chartType ? <div className="text-[10px] text-white/40">[{el.chartType} chart]</div> :
+                     <svg width={el.width} height={el.height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100" height="100" fill={el.color} rx={el.borderRadius || 0} /></svg>}
+                  </div>
                 ) : (
-                  <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
+                  <div className="w-full h-full rounded" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }} />
                 )}
               </div>
             ))}

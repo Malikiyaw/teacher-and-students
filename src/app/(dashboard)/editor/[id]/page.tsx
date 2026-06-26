@@ -25,6 +25,8 @@ import { iconLibrary, searchIcons, getIconSVG, type IconDef } from "@/lib/editor
 import { generateQR } from "@/lib/editor/qr";
 import { getAnimationCSS, getAllAnimationCSS, animationNames, type AnimationType, type AnimationDef } from "@/lib/editor/animate";
 import { exportToPDF, exportToPPTX, exportSlideAsPNG } from "@/lib/editor/export-slides";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
 
 interface SlideElement {
   id: string;
@@ -59,6 +61,7 @@ interface SlideElement {
   strokeWidth?: number;
   strokeDash?: string;
   shadow?: string;
+  codeLanguage?: string;
   flipH?: boolean;
   flipV?: boolean;
   gradient?: string;
@@ -1156,9 +1159,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       {el.content}
                     </div>
                   ) : el.type === "code" ? (
-                    <div contentEditable suppressContentEditableWarning className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 overflow-auto font-mono text-xs text-green-400 border border-white/10 outline-none" style={{ whiteSpace: "pre-wrap" }}
-                      onBlur={(e) => { const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = updated[activeSlide].elements.find((x) => x.id === el.id); if (elem) elem.content = e.currentTarget.textContent || ""; updateSlides(updated); }}>
-                      {el.content}
+                    <div className="w-full h-full bg-[#1E1E1E] rounded-lg overflow-auto border border-white/10">
+                      <div className="px-3 py-1 border-b border-white/5 flex items-center justify-between">
+                        <span className="text-[9px] text-white/20">{el.codeLanguage || "code"}</span>
+                        <span className="text-[9px] text-white/20">editable</span>
+                      </div>
+                      <pre className="p-3 m-0 font-mono text-xs overflow-auto" style={{ whiteSpace: "pre-wrap" }}><code className={`language-${el.codeLanguage || "plaintext"}`}
+                        dangerouslySetInnerHTML={{ __html: hljs.highlight(el.content, { language: el.codeLanguage || "plaintext", ignoreIllegals: true }).value }}
+                        contentEditable suppressContentEditableWarning
+                        onBlur={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = u[activeSlide].elements.find((x) => x.id === el.id); if (elem) elem.content = e.currentTarget.textContent || ""; updateSlides(u); }}
+                      /></pre>
                     </div>
                   ) : el.type === "divider" ? (
                     <div className="w-full h-full" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0 }} />
@@ -1494,6 +1504,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
 
+              {/* Code language selector */}
+              {activeEl.type === "code" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Language</label>
+                  <select value={activeEl.codeLanguage || "plaintext"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.codeLanguage = e.target.value === "plaintext" ? undefined : e.target.value; setSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white/60 outline-none">
+                    {["plaintext", "javascript", "typescript", "python", "html", "css", "json", "sql", "bash", "java", "cpp", "csharp", "rust", "go", "ruby", "php", "swift", "kotlin"].map(l => (
+                      <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Text highlight */}
               {activeEl.type === "text" && (
                 <div>
@@ -1683,7 +1706,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-heading text-lg text-white mb-4">Presentation Settings</h3>
             <label className="text-[11px] text-white/30 mb-1.5 block uppercase tracking-wider">Default Transition</label>
-            <select value={presentationTransition} onChange={(e) => setPresentationTransition(e.target.value as typeof presentationTransition)}
+            <select value={presentationTransition} onChange={(e) => { const t = e.target.value as typeof presentationTransition; setPresentationTransition(t); const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u.forEach(s => s.transition = t); updateSlides(u); }}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none mb-4">
               <option value="none">None</option>
               <option value="fade">Fade</option>

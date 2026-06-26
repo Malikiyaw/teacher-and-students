@@ -9,6 +9,8 @@ import {
   StopCircle, Send,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
 
 const transitionStyles = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes zoomIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}.animate-fadeIn{animation:fadeIn .5s ease-out}.animate-slideIn{animation:slideIn .4s ease-out}.animate-zoomIn{animation:zoomIn .4s ease-out}`;
 
@@ -27,6 +29,7 @@ interface SlideElement {
   fontWeight?: string;
   fontStyle?: string;
   borderRadius?: number;
+  codeLanguage?: string;
   zIndex?: number;
 }
 interface Slide {
@@ -445,7 +448,10 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
                     {el.content}
                   </div>
                 ) : el.type === "code" ? (
-                  <div className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 font-mono text-xs text-green-400 border border-white/10 overflow-auto" style={{ whiteSpace: "pre" }}>{el.content}</div>
+                  <div className="w-full h-full bg-[#1E1E1E] rounded-lg overflow-auto border border-white/10">
+                    <pre className="p-3 m-0 font-mono text-xs overflow-auto" style={{ whiteSpace: "pre" }}><code className={`language-${el.codeLanguage || "plaintext"}`}
+                      dangerouslySetInnerHTML={{ __html: hljs.highlight(el.content, { language: el.codeLanguage || "plaintext", ignoreIllegals: true }).value }} /></pre>
+                  </div>
                 ) : el.type === "image" ? (
                   <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} />
                 ) : el.type === "youtube" ? (
