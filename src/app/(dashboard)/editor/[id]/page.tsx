@@ -4,13 +4,13 @@ import { useState, useRef, use, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Plus, Trash2, Type, Image, Square, Palette, ChevronDown,
+  Plus, Trash2, Type, Image, Palette,
   Undo2, Redo2, Play, Share2, Save, ArrowLeft, MousePointer2,
   Loader2, Copy, ArrowUp, ArrowDown, StickyNote, Settings,
   Code, Minus, Download, Globe, History, AlignLeft, AlignCenter,
   AlignRight, AlignJustify, AlignStartVertical, AlignEndVertical,
   LayoutGrid, Lock, Unlock, Eye, EyeOff, GripVertical, Sparkles,
-  ChartBar, QrCode, Shapes, Expand, Shrink, List, ListOrdered,
+  ChartBar, QrCode, Shapes, Expand,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { presentationToHTML, downloadHTML } from "@/lib/export";
@@ -453,7 +453,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     updateSlides(updated, to);
   };
 
-  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube" | "line" | "table") => {
+  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube" | "line" | "table", content?: string) => {
     const newElement: SlideElement = {
       id: String(Date.now()),
       type,
@@ -461,7 +461,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       y: 100 + Math.random() * 50,
       width: type === "text" ? 300 : type === "code" ? 400 : type === "divider" ? 200 : type === "youtube" ? 400 : type === "line" ? 200 : type === "table" ? 350 : 120,
       height: type === "text" ? 40 : type === "code" ? 200 : type === "divider" ? 3 : type === "youtube" ? 225 : type === "line" ? 3 : type === "table" ? 200 : 120,
-      content: type === "text" ? "Double-click to edit" : type === "code" ? "// Your code here" : type === "youtube" ? "https://youtube.com/watch?v=..." : "",
+      content: content || (type === "text" ? "Double-click to edit" : type === "code" ? "// Your code here" : type === "youtube" ? content || "https://youtube.com/watch?v=..." : ""),
       color: type === "shape" ? "#F0EDE8" : type === "divider" ? "#C4653A" : type === "line" ? "#C4653A" : "#1C1917",
       fontSize: 18,
       zIndex: currentSlide.elements.length,
@@ -715,7 +715,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   const handleRotationMouseDown = (e: React.MouseEvent, el: SlideElement) => {
     e.stopPropagation();
-    const startAngle = Math.atan2(e.clientY - (el.y * zoom / 100 + 720 * zoom / 200), e.clientX - (el.x * zoom / 100 + 720 * zoom / 200));
+    const startAngle = Math.atan2(e.clientY - (el.y * zoom / 100 + 405 * zoom / 200), e.clientX - (el.x * zoom / 100 + 720 * zoom / 200));
     const handleRotate = (ev: MouseEvent) => {
       const currentAngle = Math.atan2(ev.clientY - (el.y * zoom / 100 + 720 * zoom / 200), ev.clientX - (el.x * zoom / 100 + 720 * zoom / 200));
       const delta = (currentAngle - startAngle) * (180 / Math.PI);
@@ -807,19 +807,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const setAnimation = (elId: string, anim: AnimationDef | null) => {
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
     const el = updated[activeSlide].elements.find(x => x.id === elId);
-    if (el) { el.animation = anim || undefined; setSlides(updated); }
+    if (el) { el.animation = anim || undefined; updateSlides(updated); }
   };
 
   const toggleVisibility = (elId: string) => {
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
     const el = updated[activeSlide].elements.find(x => x.id === elId);
-    if (el) { el.visible = !el.visible; setSlides(updated); }
+    if (el) { el.visible = !el.visible; updateSlides(updated); }
   };
 
   const toggleLock = (elId: string) => {
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
     const el = updated[activeSlide].elements.find(x => x.id === elId);
-    if (el) { el.locked = !el.locked; setSlides(updated); }
+    if (el) { el.locked = !el.locked; updateSlides(updated); }
   };
 
   const reorderLayer = (fromIndex: number, toIndex: number) => {
@@ -929,7 +929,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 <div className="absolute top-1 left-1 bg-black/60 text-[9px] text-white/70 w-4 h-4 rounded flex items-center justify-center">{i + 1}</div>
                 {slide.section && <div className="absolute top-1 left-6 text-[7px] text-white/40 truncate max-w-[80px]">{slide.section}</div>}
                 {slide.notes && <div className="absolute bottom-1 right-1"><StickyNote className="w-3 h-3 text-white/40" /></div>}
-                <button onClick={(e) => { e.stopPropagation(); const u = [...slides]; const dup = JSON.parse(JSON.stringify(slides[i])); dup.id = String(Date.now()); u.splice(i + 1, 0, dup); updateSlides(u, i + 1); }}
+                <button onClick={(e) => { e.stopPropagation(); const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const dup = JSON.parse(JSON.stringify(slides[i])); dup.id = String(Date.now()); dup.elements = (dup.elements || []).map((el: SlideElement) => ({ ...el, id: String(Date.now()) + Math.random() })); u.splice(i + 1, 0, dup); updateSlides(u, i + 1); }}
                   className="absolute top-1 right-6 p-0.5 bg-black/60 text-white/50 hover:text-sienna rounded opacity-0 group-hover:opacity-100 transition-all">
                   <Copy className="w-3 h-3" />
                 </button>
@@ -1017,7 +1017,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
             </label>
-            <button onClick={() => { const url = prompt("Enter YouTube video URL:"); if (url) { addElement("youtube"); const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = updated[activeSlide].elements[updated[activeSlide].elements.length - 1]; if (el) { el.content = url; updateSlides(updated); } } }} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="YouTube">
+            <button onClick={() => { const url = prompt("Enter YouTube video URL:"); if (url) { addElement("youtube", url); } }} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="YouTube">
               <Play className="w-4 h-4" />
             </button>
             <button onClick={() => setShowQRDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="QR Code">
@@ -1185,7 +1185,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     <iframe src={parseYouTubeUrl(el.content)} className="w-full h-full" allowFullScreen />
                   ) : el.type === "line" ? (
                     <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                      <line x1="0" y1="0" x2={(el.lineEndX || el.width) - el.x} y2={(el.lineEndY || el.height) - el.y}
+                      <line x1="0" y1="0" x2={el.lineEndX ?? el.width} y2={el.lineEndY ?? 0}
                         stroke={el.strokeColor || el.color} strokeWidth={el.strokeWidth || 3}
                         strokeDasharray={el.strokeDash || undefined}
                         markerStart={el.arrowStart === "arrow" ? "url(#arrowStart)" : undefined}
@@ -1206,7 +1206,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                           <tr key={ri}>{row.map((cell, ci) => (
                             <td key={ci} className="border border-white/20 px-2 py-1 text-xs"
                               contentEditable suppressContentEditableWarning
-                              onBlur={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = u[activeSlide].elements.find((x) => x.id === el.id); if (elem) { if (!elem.tableData) { elem.tableData = Array.from({ length: el.tableRows || 3 }, () => Array(el.tableCols || 3).fill("")); } (elem.tableData as string[][])[ri][ci] = e.currentTarget.textContent || ""; setSlides(u); } }}>
+                               onBlur={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = u[activeSlide].elements.find((x) => x.id === el.id); if (elem) { if (!elem.tableData) { elem.tableData = Array.from({ length: el.tableRows || 3 }, () => Array(el.tableCols || 3).fill("")); } (elem.tableData as string[][])[ri][ci] = e.currentTarget.textContent || ""; updateSlides(u); } }}>
                               {cell}
                             </td>
                           ))}</tr>
@@ -1317,14 +1317,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Rich text toolbar for text elements */}
               {activeEl.type === "text" && (
                 <RichTextToolbar
-                  onBold={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontWeight = e.fontWeight === "bold" ? "normal" : "bold"; setSlides(u); } }}
-                  onItalic={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontStyle = e.fontStyle === "italic" ? "normal" : "italic"; setSlides(u); } }}
-                  onUnderline={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textDecoration = e.textDecoration === "underline" ? undefined : "underline"; setSlides(u); } }}
-                  onAlign={(a) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textAlign = a; setSlides(u); } }}
-                  onBulletList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => l.startsWith("• ")); e.content = isList ? lines.map(l => l.replace(/^• /, "")).join("\n") : lines.map(l => "• " + l).join("\n"); setSlides(u); } }}
-                  onNumberedList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => /^\d+\.\s/.test(l)); e.content = isList ? lines.map(l => l.replace(/^\d+\.\s*/, "")).join("\n") : lines.map((l, i) => `${i + 1}. ${l}`).join("\n"); setSlides(u); } }}
-                  onFontSize={(d) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontSize = Math.max(8, Math.min(120, (e.fontSize || 18) + d)); setSlides(u); } }}
-                  onFontFamily={(f) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontFamily = f; setSlides(u); } }}
+                  onBold={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontWeight = e.fontWeight === "bold" ? "normal" : "bold"; updateSlides(u); } }}
+                  onItalic={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontStyle = e.fontStyle === "italic" ? "normal" : "italic"; updateSlides(u); } }}
+                  onUnderline={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textDecoration = e.textDecoration === "underline" ? undefined : "underline"; updateSlides(u); } }}
+                  onAlign={(a) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textAlign = a; updateSlides(u); } }}
+                  onBulletList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => l.startsWith("• ")); e.content = isList ? lines.map(l => l.replace(/^• /, "")).join("\n") : lines.map(l => "• " + l).join("\n"); updateSlides(u); } }}
+                  onNumberedList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => /^\d+\.\s/.test(l)); e.content = isList ? lines.map(l => l.replace(/^\d+\.\s*/, "")).join("\n") : lines.map((l, i) => `${i + 1}. ${l}`).join("\n"); updateSlides(u); } }}
+                  onFontSize={(d) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontSize = Math.max(8, Math.min(120, (e.fontSize || 18) + d)); updateSlides(u); } }}
+                  onFontFamily={(f) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontFamily = f; updateSlides(u); } }}
                   fontSize={activeEl.fontSize}
                   fontFamily={activeEl.fontFamily}
                 />
@@ -1333,7 +1333,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Color */}
               <div>
                 <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Color</label>
-                <ColorPicker value={activeEl.color || "#1C1917"} onChange={(c) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.color = c; setSlides(u); } }} />
+                <ColorPicker value={activeEl.color || "#1C1917"} onChange={(c) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.color = c; updateSlides(u); } }} />
               </div>
 
               {/* Opacity & Rotation */}
@@ -1406,16 +1406,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="col-span-2">
                       <input type="color" value={activeEl.strokeColor || activeEl.color || "#C4653A"}
-                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeColor = e.target.value; setSlides(u); } }}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeColor = e.target.value; updateSlides(u); } }}
                         className="w-full h-7 rounded cursor-pointer bg-transparent border border-white/10" />
                     </div>
                     <div>
                       <input type="number" min="0" max="20" value={activeEl.strokeWidth || 0}
-                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeWidth = parseInt(e.target.value) || 0; setSlides(u); } }}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeWidth = parseInt(e.target.value) || 0; updateSlides(u); } }}
                         className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" />
                     </div>
                   </div>
-                  <select value={activeEl.strokeDash || "solid"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeDash = e.target.value === "solid" ? undefined : e.target.value; setSlides(u); } }}
+                  <select value={activeEl.strokeDash || "solid"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeDash = e.target.value === "solid" ? undefined : e.target.value; updateSlides(u); } }}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none mt-1">
                     <option value="solid">Solid</option>
                     <option value="5,5">Dashed</option>
@@ -1430,12 +1430,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 <div>
                   <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Arrows</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <select value={activeEl.arrowStart || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowStart = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                    <select value={activeEl.arrowStart || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowStart = e.target.value === "none" ? undefined : e.target.value; updateSlides(u); } }}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
                       <option value="none">Start: None</option>
                       <option value="arrow">Start: Arrow</option>
                     </select>
-                    <select value={activeEl.arrowEnd || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowEnd = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                    <select value={activeEl.arrowEnd || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowEnd = e.target.value === "none" ? undefined : e.target.value; updateSlides(u); } }}
                       className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
                       <option value="none">End: None</option>
                       <option value="arrow">End: Arrow</option>
@@ -1457,7 +1457,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {/* Shadow effect */}
               <div>
                 <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Shadow</label>
-                <select value={activeEl.shadow || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.shadow = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                <select value={activeEl.shadow || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.shadow = e.target.value === "none" ? undefined : e.target.value; updateSlides(u); } }}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
                   <option value="none">None</option>
                   <option value="0 2px 8px rgba(0,0,0,0.15)">Soft</option>
@@ -1472,9 +1472,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <div>
                 <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Flip</label>
                 <div className="flex gap-2">
-                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipH = !el.flipH; setSlides(u); } }}
+                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipH = !el.flipH; updateSlides(u); } }}
                     className={`flex-1 text-[11px] py-1.5 rounded-lg transition-all ${activeEl.flipH ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40 hover:text-white/70"}`}>Flip H</button>
-                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipV = !el.flipV; setSlides(u); } }}
+                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipV = !el.flipV; updateSlides(u); } }}
                     className={`flex-1 text-[11px] py-1.5 rounded-lg transition-all ${activeEl.flipV ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40 hover:text-white/70"}`}>Flip V</button>
                 </div>
               </div>
@@ -1508,7 +1508,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               {activeEl.type === "code" && (
                 <div>
                   <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Language</label>
-                  <select value={activeEl.codeLanguage || "plaintext"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.codeLanguage = e.target.value === "plaintext" ? undefined : e.target.value; setSlides(u); } }}
+                  <select value={activeEl.codeLanguage || "plaintext"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.codeLanguage = e.target.value === "plaintext" ? undefined : e.target.value; updateSlides(u); } }}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white/60 outline-none">
                     {["plaintext", "javascript", "typescript", "python", "html", "css", "json", "sql", "bash", "java", "cpp", "csharp", "rust", "go", "ruby", "php", "swift", "kotlin"].map(l => (
                       <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
@@ -1523,9 +1523,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Text Highlight</label>
                   <div className="flex gap-2">
                     <input type="color" value={activeEl.highlight || "#FFEB3B"}
-                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = e.target.value === "#FFEB3B" && !activeEl.highlight ? undefined : e.target.value; setSlides(u); } }}
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = e.target.value === "#FFEB3B" && !activeEl.highlight ? undefined : e.target.value; updateSlides(u); } }}
                       className="w-8 h-8 rounded cursor-pointer bg-transparent border border-white/10" />
-                    <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = undefined; setSlides(u); } }}
+                    <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = undefined; updateSlides(u); } }}
                       className="text-[10px] text-white/30 hover:text-white/60 px-2">Clear</button>
                   </div>
                 </div>
@@ -1639,7 +1639,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <div>
                 <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Transition</label>
                 <select value={currentSlide.transition || "none"}
-                  onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].transition = e.target.value as Slide["transition"]; setSlides(u); }}
+                  onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].transition = e.target.value as Slide["transition"]; updateSlides(u); }}
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none">
                   <option value="none">None</option>
                   <option value="fade">Fade</option>
