@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+const transitionStyles = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes zoomIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}.animate-fadeIn{animation:fadeIn .5s ease-out}.animate-slideIn{animation:slideIn .4s ease-out}.animate-zoomIn{animation:zoomIn .4s ease-out}`;
+
 interface SlideElement {
   id: string;
   type: string;
@@ -19,6 +21,8 @@ interface SlideElement {
   height?: number;
   content: string;
   color: string;
+  alt?: string;
+  fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
   fontStyle?: string;
@@ -243,6 +247,14 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
     return () => clearInterval(interval);
   }, [timerRunning]);
 
+  // Inject transition keyframes
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = transitionStyles;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
+
   // Toolbar auto-hide
   useEffect(() => {
     const handleMouseMove = () => {
@@ -413,10 +425,14 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
         <div className="fixed inset-0 z-[105]" onMouseMove={(e) => setLaserPos({ x: e.clientX, y: e.clientY })} />
       )}
 
-      {/* Main slide */}
+      {/* Main slide with transition */}
       <div className="flex-1 flex items-center justify-center p-4">
         {slide ? (
-          <div className="w-full max-w-5xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg"
+          <div key={currentSlide} className={`w-full max-w-5xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg ${
+            slide.transition === "fade" ? "animate-fadeIn" :
+            slide.transition === "slide" ? "animate-slideIn" :
+            slide.transition === "zoom" ? "animate-zoomIn" : ""
+          }`}
             style={{ background: slide.background }}>
             {(slide.elements || []).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => (
               <div key={el.id} className="absolute"
@@ -425,13 +441,17 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
                   width: el.width ?? 200, height: el.height ?? 40,
                 }}>
                 {el.type === "text" ? (
-                  <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}>
+                  <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}>
                     {el.content}
                   </div>
                 ) : el.type === "code" ? (
                   <div className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 font-mono text-xs text-green-400 border border-white/10 overflow-auto" style={{ whiteSpace: "pre" }}>{el.content}</div>
                 ) : el.type === "image" ? (
-                  <img src={el.content} alt="" className="w-full h-full object-cover rounded" draggable={false} />
+                  <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} />
+                ) : el.type === "youtube" ? (
+                  <iframe src={el.content} className="w-full h-full" allowFullScreen />
+                ) : el.type === "shape" || el.type === "divider" ? (
+                  <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                 ) : (
                   <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                 )}

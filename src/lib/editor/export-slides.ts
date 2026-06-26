@@ -1,4 +1,5 @@
 import PptxGenJS from "pptxgenjs";
+import { toPng } from "html-to-image";
 
 interface ExportElement {
   type: string; x: number; y: number; width: number; height: number;
@@ -19,7 +20,7 @@ export function exportToPDF(title: string, slides: ExportSlide[]) {
     const els = slide.elements.map(el => {
       const style = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;`;
       if (el.type === "text") return `<div style="${style}color:${el.color};font-size:${el.fontSize || 18}px;font-weight:${el.fontWeight || 'normal'};font-style:${el.fontStyle || 'normal'}">${el.content}</div>`;
-      if (el.type === "image") return `<img src="${el.content}" style="${style}object-fit:cover;border-radius:${el.borderRadius || 0}px" />`;
+      if (el.type === "image") return `<img src="${el.content}" style="${style}object-fit:cover;border-radius:${el.borderRadius || 0}px" alt="" />`;
       if (el.type === "code") return `<pre style="${style}background:#1E1E1E;color:#4EC9B0;font-family:monospace;font-size:12px;padding:12px;border-radius:8px;overflow:hidden">${el.content}</pre>`;
       if (el.type === "divider") return `<div style="${style}background:${el.color};border-radius:${el.borderRadius || 0}px"></div>`;
       if (el.type === "youtube") return `<div style="${style}background:#000;display:flex;align-items:center;justify-content:center;color:white;font-size:14px">${el.content}</div>`;
@@ -88,57 +89,16 @@ export async function exportToPPTX(title: string, slides: ExportSlide[]) {
   URL.revokeObjectURL(url);
 }
 
-export function exportSlideAsPNG(slideElement: HTMLElement | null, title: string, slideIndex: number) {
+export async function exportSlideAsPNG(slideElement: HTMLElement | null, title: string, slideIndex: number) {
   if (!slideElement) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const bg = window.getComputedStyle(slideElement).background;
-  ctx.fillStyle = bg || "#FFFFFF";
-  ctx.fillRect(0, 0, 1280, 720);
-
-  const elements = slideElement.querySelectorAll<HTMLElement>("[data-element]");
-  elements.forEach((el) => {
-    const left = parseFloat(el.style.left || "0");
-    const top = parseFloat(el.style.top || "0");
-    const w = parseFloat(el.style.width || "100");
-    const h = parseFloat(el.style.height || "40");
-    const x = Math.round(left * 1280 / 720);
-    const y = Math.round(top * 720 / 405);
-    const cw = Math.round(w * 1280 / 720);
-    const ch = Math.round(h * 720 / 405);
-
-    const img = el.querySelector("img");
-    if (img) {
-      try {
-        const imgEl = new Image();
-        imgEl.crossOrigin = "anonymous";
-        imgEl.src = img.src;
-        imgEl.onload = () => ctx.drawImage(imgEl, x, y, cw, ch);
-      } catch {}
-      return;
-    }
-
-    ctx.fillStyle = el.style.background || "#F0EDE8";
-    if (el.style.background && el.style.background !== "transparent") {
-      ctx.fillRect(x, y, cw, ch);
-    }
-
-    const text = el.textContent || "";
-    if (text.trim()) {
-      const color = el.style.color || "#1C1917";
-      const fontSize = parseInt(el.style.fontSize || "18");
-      ctx.fillStyle = color;
-      ctx.font = `${fontSize * 1280 / 720}px Inter, sans-serif`;
-      ctx.fillText(text.trim(), x + 4, y + fontSize);
-    }
-  });
-
-  const link = document.createElement("a");
-  link.download = `${title.replace(/[^a-z0-9]/gi, "_")}-slide-${slideIndex + 1}.png`;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
+  try {
+    const dataUrl = await toPng(slideElement, { quality: 1, pixelRatio: 2 });
+    const link = document.createElement("a");
+    link.download = `${title.replace(/[^a-z0-9]/gi, "_")}-slide-${slideIndex + 1}.png`;
+    link.href = dataUrl;
+    link.click();
+  } catch (err) {
+    console.error("PNG export failed:", err);
+    alert("PNG export failed. Try using Print → Save as PDF instead.");
+  }
 }

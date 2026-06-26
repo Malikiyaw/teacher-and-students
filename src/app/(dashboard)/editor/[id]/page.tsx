@@ -28,7 +28,7 @@ import { exportToPDF, exportToPPTX, exportSlideAsPNG } from "@/lib/editor/export
 
 interface SlideElement {
   id: string;
-  type: "text" | "image" | "shape" | "code" | "divider" | "youtube";
+  type: "text" | "image" | "shape" | "code" | "divider" | "youtube" | "line" | "table";
   x: number;
   y: number;
   width: number;
@@ -48,18 +48,40 @@ interface SlideElement {
   chartType?: ChartType;
   chartData?: ChartData;
   iconId?: string;
+  alt?: string;
   qrContent?: string;
   qrData?: string;
   fontFamily?: string;
   textDecoration?: string;
   textAlign?: "left" | "center" | "right" | "justify";
   animation?: AnimationDef;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeDash?: string;
+  shadow?: string;
+  flipH?: boolean;
+  flipV?: boolean;
+  gradient?: string;
+  crop?: { x: number; y: number; width: number; height: number };
+  highlight?: string;
+  groupId?: string;
+  lineEndX?: number;
+  lineEndY?: number;
+  arrowStart?: string;
+  arrowEnd?: string;
+  tableRows?: number;
+  tableCols?: number;
+  tableData?: string[][];
 }
 
 interface Slide {
   id: string;
   elements: SlideElement[];
   background: string;
+  backgroundImage?: string;
+  backgroundGradient?: string;
+  showSlideNumber?: boolean;
+  section?: string;
   notes?: string;
   transition?: "none" | "fade" | "slide" | "zoom";
 }
@@ -75,6 +97,16 @@ const colorPresets = [
   "#7C3AED", "#EC4899", "#06B6D4", "#84CC16",
 ];
 
+function parseYouTubeUrl(url: string): string {
+  if (url.includes("youtube.com/embed/")) return url;
+  if (url.includes("youtube.com/shorts/")) return url.replace("youtube.com/shorts/", "youtube.com/embed/");
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (match) return `https://www.youtube.com/embed/${match[1]}`;
+  const directMatch = url.match(/^([a-zA-Z0-9_-]{11})$/);
+  if (directMatch) return `https://www.youtube.com/embed/${directMatch[1]}`;
+  return url;
+}
+
 const layoutPresets = [
   { name: "Blank", elements: [] },
   { name: "Title", elements: [{ type: "text" as const, x: 60, y: 140, width: 600, height: 60, content: "Presentation Title", color: "#1C1917", fontSize: 42, fontWeight: "bold" }, { type: "text" as const, x: 60, y: 220, width: 400, height: 30, content: "Subtitle goes here", color: "#6B6560", fontSize: 18 }] },
@@ -84,6 +116,29 @@ const layoutPresets = [
   { name: "Quote", elements: [{ type: "text" as const, x: 100, y: 120, width: 520, height: 20, content: "\u201C", color: "#C4653A", fontSize: 80, fontWeight: "bold" }, { type: "text" as const, x: 100, y: 170, width: 520, height: 100, content: "The only way to do great work is to love what you do.", color: "#1C1917", fontSize: 24, fontStyle: "italic" }, { type: "text" as const, x: 100, y: 290, width: 300, height: 30, content: "\u2014 Steve Jobs", color: "#6B6560", fontSize: 14 }] },
   { name: "Stats", elements: [{ type: "text" as const, x: 60, y: 40, width: 600, height: 50, content: "Key Statistics", color: "#1C1917", fontSize: 32, fontWeight: "bold" }, { type: "shape" as const, x: 60, y: 120, width: 180, height: 120, content: "", color: "#C4653A", borderRadius: 12 }, { type: "shape" as const, x: 270, y: 120, width: 180, height: 120, content: "", color: "#1C1917", borderRadius: 12 }, { type: "shape" as const, x: 480, y: 120, width: 180, height: 120, content: "", color: "#16A34A", borderRadius: 12 }, { type: "text" as const, x: 60, y: 145, width: 180, height: 40, content: "85%", color: "#FFFFFF", fontSize: 32, fontWeight: "bold" }, { type: "text" as const, x: 270, y: 145, width: 180, height: 40, content: "12K", color: "#FFFFFF", fontSize: 32, fontWeight: "bold" }, { type: "text" as const, x: 480, y: 145, width: 180, height: 40, content: "98%", color: "#FFFFFF", fontSize: 32, fontWeight: "bold" }, { type: "text" as const, x: 60, y: 190, width: 180, height: 30, content: "Pass Rate", color: "#FFFFFF", fontSize: 12 }, { type: "text" as const, x: 270, y: 190, width: 180, height: 30, content: "Students", color: "#FFFFFF", fontSize: 12 }, { type: "text" as const, x: 480, y: 190, width: 180, height: 30, content: "Satisfaction", color: "#FFFFFF", fontSize: 12 }] },
 ];
+
+const themePresets = [
+  { name: "Light", bg: "#FFFFFF", accent: "#C4653A", font: "var(--font-heading)" },
+  { name: "Dark", bg: "#1C1917", accent: "#E8A87C", font: "var(--font-heading)" },
+  { name: "Modern", bg: "#F8F9FA", accent: "#4361EE", font: "Inter, sans-serif" },
+  { name: "Sunset", bg: "#FFF5E6", accent: "#E76F51", font: "Georgia, serif" },
+  { name: "Ocean", bg: "#E8F4F8", accent: "#0077B6", font: "Inter, sans-serif" },
+  { name: "Forest", bg: "#F0F7F0", accent: "#2D6A4F", font: "Georgia, serif" },
+  { name: "Midnight", bg: "#1A1A2E", accent: "#E94560", font: "Inter, sans-serif" },
+  { name: "Nature", bg: "#FAF3E0", accent: "#8B5CF6", font: "Georgia, serif" },
+];
+
+const applyTheme = (theme: typeof themePresets[0], slidesParam: Slide[]): Slide[] => {
+  return slidesParam.map(s => ({
+    ...s,
+    background: theme.bg,
+    elements: s.elements.map(el => ({
+      ...el,
+      fontFamily: (el.type === "text") ? theme.font : el.fontFamily,
+      color: el.color === "#1C1917" || el.color === "#FFFFFF" ? (theme.bg === "#FFFFFF" || theme.bg === "#F8F9FA" || theme.bg === "#FFF5E6" || theme.bg === "#E8F4F8" || theme.bg === "#F0F7F0" || theme.bg === "#FAF3E0" ? "#1C1917" : "#FFFFFF") : el.color,
+    })),
+  }));
+};
 
 export default function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -102,6 +157,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [showIconMenu, setShowIconMenu] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [showAnimations, setShowAnimations] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showAlignTools, setShowAlignTools] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
@@ -116,7 +172,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [presentationTransition, setPresentationTransition] = useState<"none" | "fade" | "slide" | "zoom">("none");
   const [shareLink, setShareLink] = useState("");
   const [dragState, setDragState] = useState<{ elId: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const [resizeState, setResizeState] = useState<{ elId: string; startX: number; startY: number; origW: number; origH: number; origX: number; origY: number } | null>(null);
+  const [resizeState, setResizeState] = useState<{ elId: string; startX: number; startY: number; origW: number; origH: number; origX: number; origY: number; direction: string } | null>(null);
   const [slideDragIndex, setSlideDragIndex] = useState<number | null>(null);
   const [slideDropIndex, setSlideDropIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(100);
@@ -124,6 +180,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [snapGuides, setSnapGuides] = useState<{ type: "vertical" | "horizontal"; position: number }[]>([]);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elId: string } | null>(null);
+  const [selectionRect, setSelectionRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -131,8 +188,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const historyIndexRef = useRef(-1);
+  const activeSlideRef = useRef(activeSlide);
+  useEffect(() => { activeSlideRef.current = activeSlide; }, [activeSlide]);
+  useEffect(() => { historyIndexRef.current = historyIndex; }, [historyIndex]);
   const [versionHistory, setVersionHistory] = useState<{ slides: Slide[]; title: string; saved_at: string }[]>([]);
   const [showVersions, setShowVersions] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
 
   const currentSlide = slides[activeSlide];
@@ -149,16 +211,25 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     fontFamily: el.fontFamily ?? undefined,
     textDecoration: el.textDecoration ?? undefined,
     textAlign: el.textAlign ?? undefined,
+    strokeColor: el.strokeColor ?? undefined,
+    strokeWidth: el.strokeWidth ?? undefined,
+    strokeDash: el.strokeDash ?? undefined,
+    shadow: el.shadow ?? undefined,
+    flipH: el.flipH ?? undefined,
+    flipV: el.flipV ?? undefined,
+    gradient: el.gradient ?? undefined,
+    highlight: el.highlight ?? undefined,
   });
 
   const pushHistory = useCallback((newSlides: Slide[], newActiveSlide?: number) => {
     setHistory((prev) => {
-      const newEntry = { slides: JSON.parse(JSON.stringify(newSlides)), activeSlide: newActiveSlide ?? activeSlide };
-      const truncated = prev.slice(0, historyIndex + 1);
+      const idx = historyIndexRef.current;
+      const newEntry = { slides: JSON.parse(JSON.stringify(newSlides)), activeSlide: newActiveSlide ?? activeSlideRef.current };
+      const truncated = prev.slice(0, idx + 1);
       return [...truncated, newEntry].slice(-50);
     });
-    setHistoryIndex((prev) => Math.min(prev + 1, 49));
-  }, [historyIndex, activeSlide]);
+    setHistoryIndex((prev) => { const next = Math.min(prev + 1, 49); historyIndexRef.current = next; return next; });
+  }, []);
 
   const undo = useCallback(() => {
     if (historyIndex <= 0) return;
@@ -197,14 +268,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         setSelectedElements(all);
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (activeElement && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.contentEditable === "true")) {
-          deleteElement(activeElement);
+        if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.contentEditable === "true")) {
+          if (selectedElements.length > 0) {
+            selectedElements.forEach(id => { if (id) deleteElement(id); });
+          } else if (activeElement) {
+            deleteElement(activeElement);
+          }
         }
       }
       if (e.key === "ArrowUp" && activeElement) { e.preventDefault(); nudgeElement(0, -5); }
       if (e.key === "ArrowDown" && activeElement) { e.preventDefault(); nudgeElement(0, 5); }
       if (e.key === "ArrowLeft" && activeElement) { e.preventDefault(); nudgeElement(-5, 0); }
       if (e.key === "ArrowRight" && activeElement) { e.preventDefault(); nudgeElement(5, 0); }
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setShowHelp(h => !h); }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -374,22 +450,29 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     updateSlides(updated, to);
   };
 
-  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube") => {
+  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube" | "line" | "table") => {
     const newElement: SlideElement = {
       id: String(Date.now()),
       type,
       x: 100 + Math.random() * 50,
       y: 100 + Math.random() * 50,
-      width: type === "text" ? 300 : type === "code" ? 400 : type === "divider" ? 200 : type === "youtube" ? 400 : 120,
-      height: type === "text" ? 40 : type === "code" ? 200 : type === "divider" ? 3 : type === "youtube" ? 225 : 120,
+      width: type === "text" ? 300 : type === "code" ? 400 : type === "divider" ? 200 : type === "youtube" ? 400 : type === "line" ? 200 : type === "table" ? 350 : 120,
+      height: type === "text" ? 40 : type === "code" ? 200 : type === "divider" ? 3 : type === "youtube" ? 225 : type === "line" ? 3 : type === "table" ? 200 : 120,
       content: type === "text" ? "Double-click to edit" : type === "code" ? "// Your code here" : type === "youtube" ? "https://youtube.com/watch?v=..." : "",
-      color: type === "shape" ? "#F0EDE8" : type === "divider" ? "#C4653A" : "#1C1917",
+      color: type === "shape" ? "#F0EDE8" : type === "divider" ? "#C4653A" : type === "line" ? "#C4653A" : "#1C1917",
       fontSize: 18,
       zIndex: currentSlide.elements.length,
       visible: true,
       locked: false,
       rotation: 0,
       opacity: 1,
+      strokeWidth: type === "line" ? 3 : undefined,
+      lineEndX: type === "line" ? 200 : undefined,
+      lineEndY: type === "line" ? 0 : undefined,
+      arrowEnd: type === "line" ? "arrow" : undefined,
+      tableRows: type === "table" ? 3 : undefined,
+      tableCols: type === "table" ? 3 : undefined,
+      tableData: type === "table" ? Array.from({ length: 3 }, () => Array(3).fill("")) : undefined,
     };
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
     updated[activeSlide].elements.push(newElement);
@@ -400,25 +483,40 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) { alert("Image must be under 10MB"); return; }
+    const validTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+    if (!validTypes.includes(file.type)) { alert("Only PNG, JPEG, GIF, WebP allowed"); return; }
     setUploading(true);
+    let imgUrl = "";
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const ext = file.name.split(".").pop();
-    const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("files").upload(path, file);
-    if (!error) {
-      const { data: urlData } = supabase.storage.from("files").getPublicUrl(path);
-      const newElement: SlideElement = {
-        id: String(Date.now()), type: "image", x: 100, y: 100,
-        width: 300, height: 200, content: urlData.publicUrl,
-        color: "#FFFFFF", zIndex: currentSlide.elements.length,
-        visible: true, locked: false, rotation: 0, opacity: 1,
-      };
-      const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
-      updated[activeSlide].elements.push(newElement);
-      updateSlides(updated);
-      setActiveElement(newElement.id);
+    if (user) {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("files").upload(path, file);
+      if (!error) {
+        const { data: urlData } = supabase.storage.from("files").getPublicUrl(path);
+        if (urlData?.publicUrl) imgUrl = urlData.publicUrl;
+      }
     }
+    if (!imgUrl) {
+      imgUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+    const newElement: SlideElement = {
+      id: String(Date.now()), type: "image", x: 100, y: 100,
+      width: 300, height: 200, content: imgUrl,
+      alt: file.name.replace(/\.[^.]+$/, ""),
+      color: "#FFFFFF", zIndex: currentSlide.elements.length,
+      visible: true, locked: false, rotation: 0, opacity: 1,
+    };
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
     setUploading(false);
   };
 
@@ -522,9 +620,41 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (e.target === canvasRef.current || (e.target as HTMLElement).dataset.canvas === "true") {
       setActiveElement(null);
       setSelectedElements([]);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const startX = (e.clientX - rect.left) / (zoom / 100);
+      const startY = (e.clientY - rect.top) / (zoom / 100);
+      setSelectionRect({ startX, startY, endX: startX, endY: startY });
     }
     setContextMenu(null);
   };
+
+  useEffect(() => {
+    if (!selectionRect) return;
+    const handleMove = (e: MouseEvent) => {
+      const rect = (e.target as HTMLElement).closest("[data-canvas]")?.getBoundingClientRect();
+      if (!rect) return;
+      setSelectionRect(prev => prev ? { ...prev, endX: (e.clientX - rect.left) / (zoom / 100), endY: (e.clientY - rect.top) / (zoom / 100) } : null);
+    };
+    const handleUp = () => {
+      if (selectionRect) {
+        const sx = Math.min(selectionRect.startX, selectionRect.endX);
+        const sy = Math.min(selectionRect.startY, selectionRect.endY);
+        const sw = Math.abs(selectionRect.endX - selectionRect.startX);
+        const sh = Math.abs(selectionRect.endY - selectionRect.startY);
+        const hits = currentSlide.elements.filter(el =>
+          el.visible && el.x < sx + sw && el.x + el.width > sx && el.y < sy + sh && el.y + el.height > sy
+        );
+        if (hits.length > 0) {
+          setActiveElement(hits[0].id);
+          setSelectedElements(hits.map(h => h.id));
+        }
+      }
+      setSelectionRect(null);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
+  }, [selectionRect, currentSlide.elements, zoom]);
 
   const handleCanvasContextMenu = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).dataset.canvas === "true") {
@@ -575,9 +705,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [dragState, slides, activeSlide, pushHistory, snapEnabled]);
 
-  const handleResizeMouseDown = (e: React.MouseEvent, el: SlideElement) => {
+  const handleResizeMouseDown = (e: React.MouseEvent, el: SlideElement, direction: string = "se") => {
     e.stopPropagation();
-    setResizeState({ elId: el.id, startX: e.clientX, startY: e.clientY, origW: el.width, origH: el.height, origX: el.x, origY: el.y });
+    setResizeState({ elId: el.id, startX: e.clientX, startY: e.clientY, origW: el.width, origH: el.height, origX: el.x, origY: el.y, direction });
+  };
+
+  const handleRotationMouseDown = (e: React.MouseEvent, el: SlideElement) => {
+    e.stopPropagation();
+    const startAngle = Math.atan2(e.clientY - (el.y * zoom / 100 + 720 * zoom / 200), e.clientX - (el.x * zoom / 100 + 720 * zoom / 200));
+    const handleRotate = (ev: MouseEvent) => {
+      const currentAngle = Math.atan2(ev.clientY - (el.y * zoom / 100 + 720 * zoom / 200), ev.clientX - (el.x * zoom / 100 + 720 * zoom / 200));
+      const delta = (currentAngle - startAngle) * (180 / Math.PI);
+      const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+      const elem = updated[activeSlide].elements.find((x) => x.id === el.id);
+      if (elem) { elem.rotation = (elem.rotation || 0) + delta; setSlides(updated); }
+    };
+    const handleUp = () => { window.removeEventListener("mousemove", handleRotate); window.removeEventListener("mouseup", handleUp); pushHistory(slides); };
+    window.addEventListener("mousemove", handleRotate);
+    window.addEventListener("mouseup", handleUp);
   };
 
   useEffect(() => {
@@ -587,7 +732,19 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
       const dy = e.clientY - resizeState.startY;
       const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
       const el = updated[activeSlide].elements.find((x) => x.id === resizeState.elId);
-      if (el) { el.width = Math.max(20, resizeState.origW + dx); el.height = Math.max(20, resizeState.origH + dy); setSlides(updated); }
+      if (!el) return;
+      let { origW, origH, origX, origY } = resizeState;
+      switch (resizeState.direction) {
+        case "e": el.width = Math.max(20, origW + dx); break;
+        case "w": el.width = Math.max(20, origW - dx); el.x = origX + origW - el.width; break;
+        case "s": el.height = Math.max(20, origH + dy); break;
+        case "n": el.height = Math.max(20, origH - dy); el.y = origY + origH - el.height; break;
+        case "se": el.width = Math.max(20, origW + dx); el.height = Math.max(20, origH + dy); break;
+        case "sw": el.width = Math.max(20, origW - dx); el.x = origX + origW - el.width; el.height = Math.max(20, origH + dy); break;
+        case "ne": el.width = Math.max(20, origW + dx); el.height = Math.max(20, origH - dy); el.y = origY + origH - el.height; break;
+        case "nw": el.width = Math.max(20, origW - dx); el.x = origX + origW - el.width; el.height = Math.max(20, origH - dy); el.y = origY + origH - el.height; break;
+      }
+      setSlides(updated);
     };
     const handleUp = () => { pushHistory(slides); setResizeState(null); };
     window.addEventListener("mousemove", handleMove);
@@ -713,12 +870,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             )}
           </div>
 
-          <button onClick={saveVersion} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Save Version"><History className="w-4 h-4" /></button>
+          <button onClick={saveVersion} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Save Version"><Save className="w-4 h-4" /></button>
+          <button onClick={() => setShowVersions(true)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Version History"><History className="w-4 h-4" /></button>
           <button onClick={generateShareLink} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Share2 className="w-4 h-4" /></button>
           <button onClick={togglePublic} className={`p-2 rounded-lg transition-all ${isPublic ? "text-sienna bg-sienna/10" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}>
             <Globe className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowVersions(!showVersions)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Settings className="w-4 h-4" /></button>
+          <button onClick={() => setShowSettings(true)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-white/10 mx-1" />
           <Link href={`/present/${presentationId}`}
             className="flex items-center gap-2 text-xs font-medium text-white bg-sienna px-4 py-1.5 rounded-lg hover:bg-sienna-dark transition-all duration-300">
@@ -766,7 +924,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   )}
                 </div>
                 <div className="absolute top-1 left-1 bg-black/60 text-[9px] text-white/70 w-4 h-4 rounded flex items-center justify-center">{i + 1}</div>
+                {slide.section && <div className="absolute top-1 left-6 text-[7px] text-white/40 truncate max-w-[80px]">{slide.section}</div>}
                 {slide.notes && <div className="absolute bottom-1 right-1"><StickyNote className="w-3 h-3 text-white/40" /></div>}
+                <button onClick={(e) => { e.stopPropagation(); const u = [...slides]; const dup = JSON.parse(JSON.stringify(slides[i])); dup.id = String(Date.now()); u.splice(i + 1, 0, dup); updateSlides(u, i + 1); }}
+                  className="absolute top-1 right-6 p-0.5 bg-black/60 text-white/50 hover:text-sienna rounded opacity-0 group-hover:opacity-100 transition-all">
+                  <Copy className="w-3 h-3" />
+                </button>
                 <button onClick={(e) => { e.stopPropagation(); deleteSlide(i); }}
                   className="absolute top-1 right-1 p-0.5 bg-black/60 text-white/50 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-all">
                   <Trash2 className="w-3 h-3" />
@@ -857,6 +1020,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button onClick={() => setShowQRDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="QR Code">
               <QrCode className="w-4 h-4" />
             </button>
+            <button onClick={() => addElement("line")} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Line / Arrow">
+              <Minus className="w-4 h-4 rotate-45" />
+            </button>
+            <button onClick={() => addElement("table")} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Table">
+              <LayoutGrid className="w-4 h-4" />
+            </button>
             <div className="w-px h-4 bg-white/10 mx-1" />
             <div className="relative">
               <button onClick={() => setShowBgMenu(!showBgMenu)} className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 px-2 py-1.5 hover:bg-white/5 rounded-lg transition-all shrink-0">
@@ -901,6 +1070,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
             </div>
+            <div className="relative">
+              <button onClick={() => setShowThemeMenu(!showThemeMenu)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Themes">
+                <Sparkles className="w-4 h-4" />
+              </button>
+              {showThemeMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-2 shadow-xl z-50 w-48 max-h-72 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-1">
+                    {themePresets.map((t) => (
+                      <button key={t.name} onClick={() => { const u = applyTheme(t, slides); updateSlides(u); setShowThemeMenu(false); }}
+                        className="flex flex-col items-center gap-1 p-2 rounded hover:bg-white/10 transition-all">
+                        <div className="w-full h-6 rounded border border-white/10" style={{ background: t.bg, borderBottom: `3px solid ${t.accent}` }} />
+                        <span className="text-[9px] text-white/50">{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <button onClick={() => setShowAnimations(!showAnimations)} className={`p-1.5 rounded-lg transition-all shrink-0 ${showAnimations ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Animations">
               <Play className="w-4 h-4" />
             </button>
@@ -911,7 +1098,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-1.5 rounded-lg transition-all shrink-0 ${snapEnabled ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Snap">
               <LayoutGrid className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-1 ml-auto">
+            <button onClick={() => setZoom(100)} className="p-1 text-[10px] text-white/30 hover:text-white/60 rounded transition-all shrink-0" title="Reset Zoom">100%</button>
+            <button onClick={() => setZoom(Math.max(25, Math.min(200, Math.floor(window.innerHeight / 405 * 100))))} className="p-1 text-white/40 hover:text-white/70 rounded transition-all shrink-0" title="Fit to Canvas"><Expand className="w-3 h-3" /></button>
+            <div className="flex items-center gap-1">
               <button onClick={() => setZoom(Math.max(25, zoom - 10))} className="p-1 text-white/40 hover:text-white/70 rounded transition-all shrink-0"><Minus className="w-3 h-3" /></button>
               <span className="text-[11px] text-white/40 w-8 text-center">{zoom}%</span>
               <button onClick={() => setZoom(Math.min(200, zoom + 10))} className="p-1 text-white/40 hover:text-white/70 rounded transition-all shrink-0"><Plus className="w-3 h-3" /></button>
@@ -919,8 +1108,20 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           <div className="flex-1 flex items-center justify-center bg-[#1A1715] p-8 overflow-auto" onContextMenu={handleCanvasContextMenu}>
-            <div ref={canvasRef} className="relative shadow-2xl shadow-black/30 rounded-sm transition-all" style={{ width: 720 * zoom / 100, height: 405 * zoom / 100, background: currentSlide.background }}
+            <div ref={canvasRef} className="relative shadow-2xl shadow-black/30 rounded-sm transition-all" style={{ width: 720 * zoom / 100, height: 405 * zoom / 100, background: currentSlide.backgroundGradient || (currentSlide.backgroundImage ? `url(${currentSlide.backgroundImage}) center/cover` : currentSlide.background), backgroundColor: currentSlide.backgroundImage || currentSlide.backgroundGradient ? "transparent" : currentSlide.background }}
               onMouseDown={handleCanvasMouseDown} data-canvas="true">
+              {currentSlide.showSlideNumber && (
+                <div className="absolute bottom-2 right-3 text-[10px] text-white/30 pointer-events-none z-50">{activeSlide + 1}</div>
+              )}
+              {selectionRect && (
+                <div className="absolute border border-sienna bg-sienna/10 pointer-events-none z-40"
+                  style={{
+                    left: Math.min(selectionRect.startX, selectionRect.endX) * zoom / 100,
+                    top: Math.min(selectionRect.startY, selectionRect.endY) * zoom / 100,
+                    width: Math.abs(selectionRect.endX - selectionRect.startX) * zoom / 100,
+                    height: Math.abs(selectionRect.endY - selectionRect.startY) * zoom / 100,
+                  }} />
+              )}
               {showGrid && (
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.15 }}>
                   <defs>
@@ -944,12 +1145,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     left: el.x * zoom / 100, top: el.y * zoom / 100,
                     width: el.width * zoom / 100, height: el.height * zoom / 100,
                     zIndex: el.zIndex || 0, opacity: el.opacity,
-                    transform: `rotate(${el.rotation || 0}deg)`,
+                    transform: `rotate(${el.rotation || 0}deg)${el.flipH ? " scaleX(-1)" : ""}${el.flipV ? " scaleY(-1)" : ""}`,
+                    boxShadow: el.shadow || undefined,
                     animation: el.animation ? `${el.animation.type} ${el.animation.duration || 500}ms ${el.animation.delay || 0}ms both` : undefined,
                   }}>
                   {el.type === "text" ? (
                     <div contentEditable suppressContentEditableWarning className="w-full h-full outline-none break-words"
-                      style={{ color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle, textDecoration: el.textDecoration, textAlign: el.textAlign }}
+                      style={{ color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle, textDecoration: el.textDecoration, textAlign: el.textAlign, backgroundColor: el.highlight || undefined, borderRadius: el.borderRadius || 0, padding: "2px 4px" }}
                       onBlur={(e) => { const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = updated[activeSlide].elements.find((x) => x.id === el.id); if (elem) elem.content = e.currentTarget.textContent || ""; updateSlides(updated); }}>
                       {el.content}
                     </div>
@@ -959,20 +1161,79 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       {el.content}
                     </div>
                   ) : el.type === "divider" ? (
-                    <div className="w-full h-full" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
+                    <div className="w-full h-full" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0 }} />
                   ) : el.type === "image" ? (
-                    <img src={el.content} alt="" className="w-full h-full object-cover rounded" style={{ borderRadius: el.borderRadius || 0 }} draggable={false} />
+                    <div className="w-full h-full overflow-hidden" style={{ borderRadius: el.borderRadius || 0 }}>
+                      {el.crop ? (
+                        <img src={el.content} alt={el.alt || ""} className="absolute" draggable={false}
+                          style={{ left: -el.crop.x, top: -el.crop.y, width: el.crop.width, height: el.crop.height, objectFit: "none" }} />
+                      ) : (
+                        <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover" draggable={false} />
+                      )}
+                    </div>
                   ) : el.type === "youtube" ? (
-                    <iframe src={el.content.replace(/youtube\.com\/watch\?v=/, "youtube.com/embed/").replace(/youtu\.be\//, "youtube.com/embed/")} className="w-full h-full" allowFullScreen />
+                    <iframe src={parseYouTubeUrl(el.content)} className="w-full h-full" allowFullScreen />
+                  ) : el.type === "line" ? (
+                    <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                      <line x1="0" y1="0" x2={(el.lineEndX || el.width) - el.x} y2={(el.lineEndY || el.height) - el.y}
+                        stroke={el.strokeColor || el.color} strokeWidth={el.strokeWidth || 3}
+                        strokeDasharray={el.strokeDash || undefined}
+                        markerStart={el.arrowStart === "arrow" ? "url(#arrowStart)" : undefined}
+                        markerEnd={el.arrowEnd === "arrow" ? "url(#arrowEnd)" : undefined} />
+                      <defs>
+                        <marker id="arrowStart" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">
+                          <polygon points="8 0, 0 3, 8 6" fill={el.strokeColor || el.color} />
+                        </marker>
+                        <marker id="arrowEnd" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                          <polygon points="0 0, 8 3, 0 6" fill={el.strokeColor || el.color} />
+                        </marker>
+                      </defs>
+                    </svg>
+                  ) : el.type === "table" ? (
+                    <table className="w-full h-full border-collapse" style={{ color: el.color }}>
+                      <tbody>
+                        {(el.tableData || Array.from({ length: el.tableRows || 3 }, () => Array(el.tableCols || 3).fill("") as string[])).map((row: string[], ri: number) => (
+                          <tr key={ri}>{row.map((cell, ci) => (
+                            <td key={ci} className="border border-white/20 px-2 py-1 text-xs"
+                              contentEditable suppressContentEditableWarning
+                              onBlur={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = u[activeSlide].elements.find((x) => x.id === el.id); if (elem) { if (!elem.tableData) { elem.tableData = Array.from({ length: el.tableRows || 3 }, () => Array(el.tableCols || 3).fill("")); } (elem.tableData as string[][])[ri][ci] = e.currentTarget.textContent || ""; setSlides(u); } }}>
+                              {cell}
+                            </td>
+                          ))}</tr>
+                        ))}
+                      </tbody>
+                    </table>
                   ) : el.type === "shape" ? (
-                    <div className="w-full h-full flex items-center justify-center" style={{ borderRadius: el.borderRadius || 0 }}
+                    <div className="w-full h-full flex items-center justify-center"
+                      style={{ background: el.gradient || "transparent", borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }}
                       dangerouslySetInnerHTML={{ __html: renderShapeSVG(el) }} />
                   ) : (
-                    <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
+                    <div className="w-full h-full rounded" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }} />
                   )}
                   {activeElement === el.id && !el.locked && (
-                    <div onMouseDown={(e) => handleResizeMouseDown(e, el)}
-                      className="absolute bottom-0 right-0 w-3 h-3 bg-sienna rounded-full cursor-se-resize translate-x-1/2 translate-y-1/2" />
+                    <>
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "se")}
+                        className="absolute bottom-0 right-0 w-3 h-3 bg-sienna rounded-full cursor-se-resize translate-x-1/2 translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "sw")}
+                        className="absolute bottom-0 left-0 w-3 h-3 bg-sienna rounded-full cursor-sw-resize -translate-x-1/2 translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "ne")}
+                        className="absolute top-0 right-0 w-3 h-3 bg-sienna rounded-full cursor-ne-resize translate-x-1/2 -translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "nw")}
+                        className="absolute top-0 left-0 w-3 h-3 bg-sienna rounded-full cursor-nw-resize -translate-x-1/2 -translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "n")}
+                        className="absolute top-0 left-1/2 w-3 h-3 bg-sienna/70 rounded-full cursor-n-resize -translate-x-1/2 -translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "s")}
+                        className="absolute bottom-0 left-1/2 w-3 h-3 bg-sienna/70 rounded-full cursor-s-resize -translate-x-1/2 translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "e")}
+                        className="absolute top-1/2 right-0 w-3 h-3 bg-sienna/70 rounded-full cursor-e-resize translate-x-1/2 -translate-y-1/2 z-10" />
+                      <div onMouseDown={(e) => handleResizeMouseDown(e, el, "w")}
+                        className="absolute top-1/2 left-0 w-3 h-3 bg-sienna/70 rounded-full cursor-w-resize -translate-x-1/2 -translate-y-1/2 z-10" />
+                      {/* Rotation handle */}
+                      <div onMouseDown={(e) => handleRotationMouseDown(e, el)}
+                        className="absolute -top-6 left-1/2 w-4 h-4 bg-white border-2 border-sienna rounded-full cursor-grab -translate-x-1/2 z-10">
+                        <div className="absolute top-4 left-1/2 w-px h-3 bg-sienna -translate-x-1/2" />
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
@@ -1019,6 +1280,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <span>Del Delete</span>
               <span>Arrows Nudge</span>
               <span>720 x 405</span>
+              <button onClick={() => setShowHelp(!showHelp)} className="text-white/30 hover:text-white/60 transition-colors" title="Keyboard Shortcuts">? Help</button>
             </div>
           </div>
         </div>
@@ -1049,8 +1311,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   onItalic={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontStyle = e.fontStyle === "italic" ? "normal" : "italic"; setSlides(u); } }}
                   onUnderline={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textDecoration = e.textDecoration === "underline" ? undefined : "underline"; setSlides(u); } }}
                   onAlign={(a) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textAlign = a; setSlides(u); } }}
-                  onBulletList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.content = "• " + e.content.split("\n").join("\n• "); setSlides(u); } }}
-                  onNumberedList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); e.content = lines.map((l, i) => `${i + 1}. ${l}`).join("\n"); setSlides(u); } }}
+                  onBulletList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => l.startsWith("• ")); e.content = isList ? lines.map(l => l.replace(/^• /, "")).join("\n") : lines.map(l => "• " + l).join("\n"); setSlides(u); } }}
+                  onNumberedList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); const isList = lines.every(l => /^\d+\.\s/.test(l)); e.content = isList ? lines.map(l => l.replace(/^\d+\.\s*/, "")).join("\n") : lines.map((l, i) => `${i + 1}. ${l}`).join("\n"); setSlides(u); } }}
                   onFontSize={(d) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontSize = Math.max(8, Math.min(120, (e.fontSize || 18) + d)); setSlides(u); } }}
                   onFontFamily={(f) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontFamily = f; setSlides(u); } }}
                   fontSize={activeEl.fontSize}
@@ -1127,6 +1389,152 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   className="w-full accent-sienna" />
               </div>
 
+              {/* Stroke controls for shapes/lines */}
+              {(activeEl.type === "shape" || activeEl.type === "line") && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Stroke</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <input type="color" value={activeEl.strokeColor || activeEl.color || "#C4653A"}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeColor = e.target.value; setSlides(u); } }}
+                        className="w-full h-7 rounded cursor-pointer bg-transparent border border-white/10" />
+                    </div>
+                    <div>
+                      <input type="number" min="0" max="20" value={activeEl.strokeWidth || 0}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeWidth = parseInt(e.target.value) || 0; setSlides(u); } }}
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" />
+                    </div>
+                  </div>
+                  <select value={activeEl.strokeDash || "solid"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.strokeDash = e.target.value === "solid" ? undefined : e.target.value; setSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none mt-1">
+                    <option value="solid">Solid</option>
+                    <option value="5,5">Dashed</option>
+                    <option value="2,4">Dotted</option>
+                    <option value="10,5">Long Dash</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Arrow options for lines */}
+              {activeEl.type === "line" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Arrows</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select value={activeEl.arrowStart || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowStart = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
+                      <option value="none">Start: None</option>
+                      <option value="arrow">Start: Arrow</option>
+                    </select>
+                    <select value={activeEl.arrowEnd || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.arrowEnd = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
+                      <option value="none">End: None</option>
+                      <option value="arrow">End: Arrow</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <div><span className="text-[10px] text-white/20">End X</span>
+                      <input type="number" value={activeEl.lineEndX || 0}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.lineEndX = parseInt(e.target.value) || 0; setSlides(u); } }}
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" /></div>
+                    <div><span className="text-[10px] text-white/20">End Y</span>
+                      <input type="number" value={activeEl.lineEndY || 0}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.lineEndY = parseInt(e.target.value) || 0; setSlides(u); } }}
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shadow effect */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Shadow</label>
+                <select value={activeEl.shadow || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.shadow = e.target.value === "none" ? undefined : e.target.value; setSlides(u); } }}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white/60 outline-none">
+                  <option value="none">None</option>
+                  <option value="0 2px 8px rgba(0,0,0,0.15)">Soft</option>
+                  <option value="0 4px 16px rgba(0,0,0,0.2)">Medium</option>
+                  <option value="0 8px 32px rgba(0,0,0,0.3)">Strong</option>
+                  <option value="0 0 20px rgba(196,101,58,0.3)">Glow (Sienna)</option>
+                  <option value="0 0 20px rgba(37,99,235,0.3)">Glow (Blue)</option>
+                </select>
+              </div>
+
+              {/* Flip controls */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Flip</label>
+                <div className="flex gap-2">
+                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipH = !el.flipH; setSlides(u); } }}
+                    className={`flex-1 text-[11px] py-1.5 rounded-lg transition-all ${activeEl.flipH ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40 hover:text-white/70"}`}>Flip H</button>
+                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.flipV = !el.flipV; setSlides(u); } }}
+                    className={`flex-1 text-[11px] py-1.5 rounded-lg transition-all ${activeEl.flipV ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40 hover:text-white/70"}`}>Flip V</button>
+                </div>
+              </div>
+
+              {/* Gradient for shapes */}
+              {activeEl.type === "shape" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Gradient</label>
+                  <input type="text" value={activeEl.gradient || ""} placeholder="e.g. linear-gradient(45deg, #C4653A, #1C1917)"
+                    onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.gradient = e.target.value || undefined; setSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                </div>
+              )}
+
+              {/* Crop for images */}
+              {activeEl.type === "image" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Crop</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(["x", "y", "width", "height"] as const).map((k) => (
+                      <div key={k}><span className="text-[10px] text-white/20">{k}</span>
+                        <input type="number" value={activeEl.crop?.[k] ?? (k === "width" ? activeEl.width : k === "height" ? activeEl.height : 0)}
+                          onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { if (!el.crop) el.crop = { x: 0, y: 0, width: el.width, height: el.height }; el.crop[k] = parseInt(e.target.value) || 0; setSlides(u); } }}
+                          className="w-full bg-white/5 border border-white/10 rounded px-1 py-1 text-[10px] text-white/60 outline-none" /></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Text highlight */}
+              {activeEl.type === "text" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Text Highlight</label>
+                  <div className="flex gap-2">
+                    <input type="color" value={activeEl.highlight || "#FFEB3B"}
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = e.target.value === "#FFEB3B" && !activeEl.highlight ? undefined : e.target.value; setSlides(u); } }}
+                      className="w-8 h-8 rounded cursor-pointer bg-transparent border border-white/10" />
+                    <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.highlight = undefined; setSlides(u); } }}
+                      className="text-[10px] text-white/30 hover:text-white/60 px-2">Clear</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Table controls */}
+              {activeEl.type === "table" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Table Size</label>
+                  <div className="flex gap-2">
+                    <div><span className="text-[10px] text-white/20">Rows</span>
+                      <input type="number" min="1" max="20" value={activeEl.tableRows || 3}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { const r = parseInt(e.target.value) || 1; el.tableRows = r; el.tableData = Array.from({ length: r }, (_, ri) => Array(el.tableCols || 3).fill(el.tableData?.[ri]?.[0] || "")); setSlides(u); } }}
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" /></div>
+                    <div><span className="text-[10px] text-white/20">Cols</span>
+                      <input type="number" min="1" max="20" value={activeEl.tableCols || 3}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { const c = parseInt(e.target.value) || 1; el.tableCols = c; el.tableData = (el.tableData || Array.from({ length: el.tableRows || 3 }, () => Array(c).fill(""))).map(row => { while (row.length < c) row.push(""); return row.slice(0, c); }); setSlides(u); } }}
+                        className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white/60 outline-none" /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* &lt;img&gt; alt text */}
+              {activeEl.type === "image" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Alt Text</label>
+                  <input type="text" value={activeEl.alt || ""}
+                    onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.alt = e.target.value; setSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                </div>
+              )}
+
               {/* Z-Index */}
               <div>
                 <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Layer</label>
@@ -1163,8 +1571,45 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
               {/* Background */}
               <div>
-                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Background</label>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Background Color</label>
                 <ColorPicker value={currentSlide.background} onChange={(c) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].background = c; updateSlides(u); }} />
+              </div>
+
+              {/* Background Image */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Background Image URL</label>
+                <input type="text" value={currentSlide.backgroundImage || ""} placeholder="https://..." 
+                  onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].backgroundImage = e.target.value || undefined; updateSlides(u); }}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                {currentSlide.backgroundImage && (
+                  <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].backgroundImage = undefined; updateSlides(u); }}
+                    className="text-[10px] text-red-400/70 hover:text-red-400 mt-1">Remove Image</button>
+                )}
+              </div>
+
+              {/* Background Gradient */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Background Gradient</label>
+                <input type="text" value={currentSlide.backgroundGradient || ""} placeholder="e.g. linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                  onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].backgroundGradient = e.target.value || undefined; updateSlides(u); }}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+              </div>
+
+              {/* Slide Section */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Section</label>
+                <input type="text" value={currentSlide.section || ""} placeholder="e.g. Introduction"
+                  onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].section = e.target.value || undefined; updateSlides(u); }}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+              </div>
+
+              {/* Slide Number */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider">Slide Number</span>
+                <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; u[activeSlide].showSlideNumber = !u[activeSlide].showSlideNumber; updateSlides(u); }}
+                  className={`text-[11px] px-3 py-1 rounded-lg transition-all ${currentSlide.showSlideNumber ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>
+                  {currentSlide.showSlideNumber ? "Show" : "Hide"}
+                </button>
               </div>
 
               {/* Slide Transition */}
@@ -1192,9 +1637,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           onCopy={() => {
             const el = currentSlide.elements.find(e => e.id === contextMenu.elId);
             if (el) {
-              navigator.clipboard.writeText(el.content || "").catch(() => {});
+              navigator.clipboard.writeText(JSON.stringify(el, null, 2)).catch(() => {});
             }
-            duplicateElement();
           }}
           onDelete={() => deleteElement(contextMenu.elId)}
           onBringFront={bringToFront}
@@ -1247,6 +1691,32 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <option value="zoom">Zoom</option>
             </select>
             <button onClick={() => setShowSettings(false)} className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowHelp(false)}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-80 border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Keyboard Shortcuts</h3>
+            <div className="space-y-2 text-xs text-white/60">
+              {[
+                ["Ctrl+Z", "Undo"],
+                ["Ctrl+Shift+Z / Ctrl+Y", "Redo"],
+                ["Ctrl+D", "Duplicate element"],
+                ["Ctrl+A", "Select all elements"],
+                ["Delete / Backspace", "Delete element"],
+                ["Arrow keys", "Nudge element 5px"],
+                ["?", "Toggle this help"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex justify-between items-center">
+                  <kbd className="bg-white/10 px-2 py-0.5 rounded text-[10px] text-white/40 font-mono">{key}</kbd>
+                  <span>{desc}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowHelp(false)} className="w-full mt-4 text-xs text-white/40 hover:text-white/60 transition-colors">Close</button>
           </div>
         </div>
       )}
