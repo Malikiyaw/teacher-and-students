@@ -12,10 +12,9 @@ interface ContextMenuProps {
   onBringFront: () => void;
   onSendBack: () => void;
   onDuplicate: () => void;
-  onGroup: () => void;
 }
 
-export default function ElementContextMenu({ x, y, onClose, onCopy, onDelete, onBringFront, onSendBack, onDuplicate, onGroup }: ContextMenuProps) {
+export default function ElementContextMenu({ x, y, onClose, onCopy, onDelete, onBringFront, onSendBack, onDuplicate }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,7 +36,6 @@ export default function ElementContextMenu({ x, y, onClose, onCopy, onDelete, on
     { icon: ArrowUp, label: "Bring to Front", shortcut: "", action: onBringFront },
     { icon: ArrowDown, label: "Send to Back", shortcut: "", action: onSendBack },
     { divider: true },
-    { icon: ChevronUp, label: "Group", shortcut: "Ctrl+G", action: onGroup },
     { icon: Trash2, label: "Delete", shortcut: "Del", action: onDelete, danger: true },
   ];
 

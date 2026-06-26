@@ -23,7 +23,7 @@ import { alignElements, distributeElements, findSnapGuides } from "@/lib/editor/
 import { generateDefaultChartData, renderChartSVG, type ChartType, type ChartData } from "@/lib/editor/charts";
 import { iconLibrary, searchIcons, getIconSVG, type IconDef } from "@/lib/editor/icons";
 import { generateQR } from "@/lib/editor/qr";
-import { getAnimationCSS, animationNames, type AnimationType, type AnimationDef } from "@/lib/editor/animate";
+import { getAnimationCSS, getAllAnimationCSS, animationNames, type AnimationType, type AnimationDef } from "@/lib/editor/animate";
 import { exportToPDF, exportToPPTX, exportSlideAsPNG } from "@/lib/editor/export-slides";
 
 interface SlideElement {
@@ -49,6 +49,10 @@ interface SlideElement {
   chartData?: ChartData;
   iconId?: string;
   qrContent?: string;
+  qrData?: string;
+  fontFamily?: string;
+  textDecoration?: string;
+  textAlign?: "left" | "center" | "right" | "justify";
   animation?: AnimationDef;
 }
 
@@ -123,6 +127,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const canvasRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const animStyleRef = useRef<HTMLStyleElement | null>(null);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -141,6 +146,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     fontSize: el.fontSize ?? 18,
     zIndex: el.zIndex ?? 0,
     borderRadius: el.borderRadius ?? 0,
+    fontFamily: el.fontFamily ?? undefined,
+    textDecoration: el.textDecoration ?? undefined,
+    textAlign: el.textAlign ?? undefined,
   });
 
   const pushHistory = useCallback((newSlides: Slide[], newActiveSlide?: number) => {
@@ -295,6 +303,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     saveTimerRef.current = setTimeout(autoSave, 2000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [slides, title, autoSave]);
+
+  useEffect(() => {
+    if (!animStyleRef.current) {
+      const style = document.createElement("style");
+      style.textContent = getAllAnimationCSS();
+      document.head.appendChild(style);
+      animStyleRef.current = style;
+    }
+  }, []);
 
   const exportHTML = () => {
     const html = presentationToHTML(slides, title);
@@ -458,14 +475,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     setShowIconMenu(false);
   };
 
-  const addQRElement = () => {
+  const addQRElement = async () => {
     if (!qrUrl) return;
+    const qrData = await generateQR(qrUrl, Math.min(200, 200));
     const newElement: SlideElement = {
       id: String(Date.now()), type: "shape",
       x: 100, y: 100, width: 200, height: 200,
       content: "qr", color: "transparent",
       zIndex: currentSlide.elements.length,
       qrContent: qrUrl,
+      qrData,
       visible: true, locked: false, rotation: 0, opacity: 1,
     };
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
@@ -486,8 +505,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (el.chartType && el.chartData) {
       return renderChartSVG(el.chartData, el.chartType, el.width, el.height);
     }
+    if (el.qrData) {
+      return el.qrData;
+    }
     if (el.qrContent) {
-      return generateQR(el.qrContent, Math.min(el.width, el.height));
+      return `<div style="width:${el.width}px;height:${el.height}px;display:flex;align-items:center;justify-content:center;background:#f0f0f0;color:#999;font-size:12px">QR Code</div>`;
     }
     const shape = getShapeById(el.content || el.shapeId || "rect");
     if (!shape) return "";
@@ -825,8 +847,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button onClick={() => addElement("divider")} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Divider">
               <Minus className="w-4 h-4" />
             </button>
-            <label className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all cursor-pointer shrink-0" title="Image">
-              <Image className="w-4 h-4" />
+            <label className={`p-1.5 rounded-lg transition-all cursor-pointer shrink-0 ${uploading ? "text-sienna animate-pulse" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Image">
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
               <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
             </label>
             <button onClick={() => { const url = prompt("Enter YouTube video URL:"); if (url) { addElement("youtube"); const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = updated[activeSlide].elements[updated[activeSlide].elements.length - 1]; if (el) { el.content = url; updateSlides(updated); } } }} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="YouTube">
@@ -914,7 +936,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   style={guide.type === "vertical" ? { left: guide.position * zoom / 100, top: 0 } : { top: guide.position * zoom / 100, left: 0 }} />
               ))}
               {currentSlide.elements.filter(el => el.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => (
-                <div key={el.id}
+                <div key={el.id} data-element="true"
                   onMouseDown={(e) => handleElementMouseDown(e, el)}
                   onContextMenu={(e) => handleElementContextMenu(e, el)}
                   className={`absolute select-none ${activeElement === el.id ? "ring-2 ring-sienna" : "hover:ring-1 hover:ring-white/20"} ${el.locked ? "cursor-not-allowed" : !dragState ? "cursor-move" : ""} ${el.animation ? "animate__animated" : ""}`}
@@ -927,12 +949,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   }}>
                   {el.type === "text" ? (
                     <div contentEditable suppressContentEditableWarning className="w-full h-full outline-none break-words"
-                      style={{ color: el.color, fontSize: el.fontSize, fontFamily: "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}
+                      style={{ color: el.color, fontSize: el.fontSize, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle, textDecoration: el.textDecoration, textAlign: el.textAlign }}
                       onBlur={(e) => { const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = updated[activeSlide].elements.find((x) => x.id === el.id); if (elem) elem.content = e.currentTarget.textContent || ""; updateSlides(updated); }}>
                       {el.content}
                     </div>
                   ) : el.type === "code" ? (
-                    <div className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 overflow-auto font-mono text-xs text-green-400 border border-white/10" style={{ whiteSpace: "pre" }}>{el.content}</div>
+                    <div contentEditable suppressContentEditableWarning className="w-full h-full bg-[#1E1E1E] rounded-lg p-3 overflow-auto font-mono text-xs text-green-400 border border-white/10 outline-none" style={{ whiteSpace: "pre-wrap" }}
+                      onBlur={(e) => { const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; const elem = updated[activeSlide].elements.find((x) => x.id === el.id); if (elem) elem.content = e.currentTarget.textContent || ""; updateSlides(updated); }}>
+                      {el.content}
+                    </div>
                   ) : el.type === "divider" ? (
                     <div className="w-full h-full" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                   ) : el.type === "image" ? (
@@ -1002,7 +1027,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <div className="w-64 bg-[#231F1D] border-l border-white/5 flex flex-col shrink-0 overflow-y-auto">
           <div className="p-3 border-b border-white/5 flex items-center justify-between">
             <span className="text-xs font-medium text-white/40">{activeElement ? "Properties" : "Slide"}</span>
-            {activeElement && <button onClick={() => setShowNotes(!showNotes)} className={`p-1 rounded ${showNotes ? "text-sienna" : "text-white/30 hover:text-white/60"}`}><StickyNote className="w-3.5 h-3.5" /></button>}
+            <button onClick={() => setShowNotes(!showNotes)} className={`p-1 rounded ${showNotes ? "text-sienna" : "text-white/30 hover:text-white/60"}`}><StickyNote className="w-3.5 h-3.5" /></button>
           </div>
           {activeElement && activeEl ? (
             <div className="flex-1 space-y-4 p-4">
@@ -1022,9 +1047,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 <RichTextToolbar
                   onBold={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontWeight = e.fontWeight === "bold" ? "normal" : "bold"; setSlides(u); } }}
                   onItalic={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontStyle = e.fontStyle === "italic" ? "normal" : "italic"; setSlides(u); } }}
+                  onUnderline={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textDecoration = e.textDecoration === "underline" ? undefined : "underline"; setSlides(u); } }}
+                  onAlign={(a) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.textAlign = a; setSlides(u); } }}
+                  onBulletList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.content = "• " + e.content.split("\n").join("\n• "); setSlides(u); } }}
+                  onNumberedList={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { const lines = e.content.split("\n"); e.content = lines.map((l, i) => `${i + 1}. ${l}`).join("\n"); setSlides(u); } }}
                   onFontSize={(d) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontSize = Math.max(8, Math.min(120, (e.fontSize || 18) + d)); setSlides(u); } }}
-                  onFontFamily={(f) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.content = f; setSlides(u); } }}
+                  onFontFamily={(f) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const e = u[activeSlide].elements.find(x => x.id === activeElement); if (e) { e.fontFamily = f; setSlides(u); } }}
                   fontSize={activeEl.fontSize}
+                  fontFamily={activeEl.fontFamily}
                 />
               )}
 
@@ -1159,12 +1189,17 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         <ElementContextMenu
           x={contextMenu.x} y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          onCopy={duplicateElement}
+          onCopy={() => {
+            const el = currentSlide.elements.find(e => e.id === contextMenu.elId);
+            if (el) {
+              navigator.clipboard.writeText(el.content || "").catch(() => {});
+            }
+            duplicateElement();
+          }}
           onDelete={() => deleteElement(contextMenu.elId)}
           onBringFront={bringToFront}
           onSendBack={sendToBack}
           onDuplicate={duplicateElement}
-          onGroup={() => {}}
         />
       )}
 

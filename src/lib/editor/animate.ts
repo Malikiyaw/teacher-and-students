@@ -2,31 +2,36 @@ export type AnimationType = "fade-in" | "fade-out" | "slide-up" | "slide-down" |
 
 export interface AnimationDef {
   type: AnimationType;
-  duration: number; // ms
-  delay: number; // ms
+  duration: number;
+  delay: number;
   easing: string;
 }
 
 export function getAnimationCSS(anim: AnimationDef): string {
   const d = anim.duration || 500;
   const del = anim.delay || 0;
+  const name = anim.type;
   switch (anim.type) {
-    case "fade-in": return `@keyframes fi{from{opacity:0}to{opacity:1}}.a{animation:fi ${d}ms ${del}ms both ease-out}`;
-    case "fade-out": return `@keyframes fo{from{opacity:1}to{opacity:0}}.a{animation:fo ${d}ms ${del}ms both ease-in}`;
-    case "slide-up": return `@keyframes su{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}.a{animation:su ${d}ms ${del}ms both ease-out}`;
-    case "slide-down": return `@keyframes sd{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}.a{animation:sd ${d}ms ${del}ms both ease-out}`;
-    case "slide-left": return `@keyframes sl{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}.a{animation:sl ${d}ms ${del}ms both ease-out}`;
-    case "slide-right": return `@keyframes sr{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}.a{animation:sr ${d}ms ${del}ms both ease-out}`;
-    case "zoom-in": return `@keyframes zi{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}.a{animation:zi ${d}ms ${del}ms both ease-out}`;
-    case "zoom-out": return `@keyframes zo{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}.a{animation:zo ${d}ms ${del}ms both ease-out}`;
-    case "bounce": return `@keyframes bo{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}.a{animation:bo ${d}ms ${del}ms both ease}`;
-    case "rotate": return `@keyframes ro{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.a{animation:ro ${d}ms ${del}ms both linear}`;
-    case "pulse": return `@keyframes pu{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}.a{animation:pu ${d}ms ${del}ms both ease-in-out infinite}`;
-    case "shake": return `@keyframes sh{0%{transform:translateX(0)}10%{transform:translateX(-5px)}20%{transform:translateX(5px)}30%{transform:translateX(-5px)}40%{transform:translateX(5px)}50%{transform:translateX(0)}}.a{animation:sh ${d}ms ${del}ms both ease}`;
-    case "flip": return `@keyframes fl{0%{transform:perspective(400px) rotateX(90deg);opacity:0}40%{transform:perspective(400px) rotateX(-20deg)}100%{transform:perspective(400px) rotateX(0);opacity:1}}.a{animation:fl ${d}ms ${del}ms both ease-out}`;
-    case "pop": return `@keyframes po{0%{transform:scale(0);opacity:0}50%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}.a{animation:po ${d}ms ${del}ms both ease-out}`;
+    case "fade-in": return `@keyframes fade-in{from{opacity:0}to{opacity:1}}.a{animation:fade-in ${d}ms ${del}ms both ease-out}`;
+    case "fade-out": return `@keyframes fade-out{from{opacity:1}to{opacity:0}}.a{animation:fade-out ${d}ms ${del}ms both ease-in}`;
+    case "slide-up": return `@keyframes slide-up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}.a{animation:slide-up ${d}ms ${del}ms both ease-out}`;
+    case "slide-down": return `@keyframes slide-down{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}.a{animation:slide-down ${d}ms ${del}ms both ease-out}`;
+    case "slide-left": return `@keyframes slide-left{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}.a{animation:slide-left ${d}ms ${del}ms both ease-out}`;
+    case "slide-right": return `@keyframes slide-right{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}.a{animation:slide-right ${d}ms ${del}ms both ease-out}`;
+    case "zoom-in": return `@keyframes zoom-in{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}.a{animation:zoom-in ${d}ms ${del}ms both ease-out}`;
+    case "zoom-out": return `@keyframes zoom-out{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}.a{animation:zoom-out ${d}ms ${del}ms both ease-out}`;
+    case "bounce": return `@keyframes bounce{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}.a{animation:bounce ${d}ms ${del}ms both ease}`;
+    case "rotate": return `@keyframes rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.a{animation:rotate ${d}ms ${del}ms both linear}`;
+    case "pulse": return `@keyframes pulse{0%{opacity:1}50%{opacity:0.5}100%{opacity:1}}.a{animation:pulse ${d}ms ${del}ms both ease-in-out infinite}`;
+    case "shake": return `@keyframes shake{0%{transform:translateX(0)}10%{transform:translateX(-5px)}20%{transform:translateX(5px)}30%{transform:translateX(-5px)}40%{transform:translateX(5px)}50%{transform:translateX(0)}}.a{animation:shake ${d}ms ${del}ms both ease}`;
+    case "flip": return `@keyframes flip{0%{transform:perspective(400px) rotateX(90deg);opacity:0}40%{transform:perspective(400px) rotateX(-20deg)}100%{transform:perspective(400px) rotateX(0);opacity:1}}.a{animation:flip ${d}ms ${del}ms both ease-out}`;
+    case "pop": return `@keyframes pop{0%{transform:scale(0);opacity:0}50%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}.a{animation:pop ${d}ms ${del}ms both ease-out}`;
     default: return "";
   }
+}
+
+export function getAllAnimationCSS(): string {
+  return animationNames.map(a => getAnimationCSS({ type: a.value, duration: 500, delay: 0, easing: "ease-out" })).join("\n");
 }
 
 export const animationNames: { value: AnimationType; label: string }[] = [
