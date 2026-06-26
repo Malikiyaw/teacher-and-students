@@ -381,7 +381,32 @@ After first deploy:
 4. Select events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
 5. Copy the **Webhook signing secret** → add it to Vercel as `STRIPE_WEBHOOK_SECRET`
 
-## Step 6: Custom Domain (Optional)
+## Step 6: Fix Login — Disable Email Confirmation
+
+**If users get "Invalid login credentials" right after signing up, this is why.**
+
+By default, Supabase requires users to click a confirmation link in their email before they can log in. This causes two problems:
+1. Sign-up creates the user but marks them unconfirmed — login fails
+2. The app immediately redirects to `/dashboard` on sign-up even though no session exists
+
+### To fix, go to your Supabase dashboard:
+
+1. **Authentication → Settings** (gear icon at the top of the Authentication section)
+2. Scroll to **Security / User Signups** section
+3. Turn **"Confirm email"** toggle **OFF**
+4. Click **Save**
+
+> If you don't see "Confirm email", look under **Authentication → Emails** for the **"Enable email confirmations"** toggle and turn it **OFF**.
+
+After this, new users can sign up and log in immediately.
+
+## Step 7: Set Site URL in Supabase (Required for Vercel)
+
+1. **Supabase Dashboard → Authentication → URL Configuration**
+2. Set **Site URL** to your Vercel deployment URL: `https://teacher-and-students.vercel.app`
+3. Add `http://localhost:3000` (for local development) and your production URL under **Redirect URLs**
+
+## Step 8: Custom Domain (Optional)
 
 1. In Vercel dashboard, go to your project → **Settings → Domains**
 2. Add your custom domain

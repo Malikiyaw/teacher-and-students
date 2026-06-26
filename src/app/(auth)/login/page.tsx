@@ -27,7 +27,11 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setError(error.message);
+      if (error.message === "Invalid login credentials") {
+        setError("Invalid email or password. If you just signed up, check your email for a confirmation link first.");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
     } else {
       router.push("/dashboard");
