@@ -28,7 +28,7 @@ export default function LoginPage() {
 
     if (error) {
       if (error.message === "Invalid login credentials") {
-        setError("Invalid email or password. If you just signed up, check your email for a confirmation link first.");
+        setError("Invalid email or password. Try resetting your password or signing up with a different email.");
       } else {
         setError(error.message);
       }

@@ -40,7 +40,11 @@ export default function SignupPage() {
     });
 
     if (error) {
-      setError(error.message);
+      if (error.message.includes("User already registered")) {
+        setError("An account with this email already exists. Please log in instead.");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
