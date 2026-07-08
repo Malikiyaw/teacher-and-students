@@ -289,7 +289,7 @@ export function SpellCheckPanel({ elements, onFix, onIgnore }: SpellCheckPanelPr
   }, [spellingIssues, grammarIssues, textElements, onFix]);
 
   return (
-    <div className="flex flex-col h-full bg-[#1A1715] text-white">
+    <div className="flex flex-col h-full bg-[#231F1D] text-white">
       <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0">
         <span className="text-xs font-medium text-white/40 flex items-center gap-1.5">
           <CheckCheck className="w-3.5 h-3.5" /> Spell & Grammar

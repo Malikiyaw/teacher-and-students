@@ -2412,7 +2412,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         </div>
 
         {/* Properties panel - right side */}
-        <div className="w-64 bg-[#231F1D] border-l border-white/5 flex flex-col shrink-0 overflow-y-auto">
+        <div className="w-64 bg-[#231F1D] border-l border-white/10 flex flex-col shrink-0 overflow-y-auto">
           {showSpellCheck ? (
             <SpellCheckPanel
               elements={currentSlide.elements.map(el => ({ id: el.id, type: el.type, content: el.content }))}
