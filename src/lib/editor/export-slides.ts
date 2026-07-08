@@ -19,8 +19,14 @@ export function exportToPDF(title: string, slides: ExportSlide[]) {
   const slidesHTML = slides.map((slide) => {
     const els = slide.elements.map(el => {
       const style = `position:absolute;left:${el.x}px;top:${el.y}px;width:${el.width}px;height:${el.height}px;`;
-      if (el.type === "text") return `<div style="${style}color:${el.color};font-size:${el.fontSize || 18}px;font-weight:${el.fontWeight || 'normal'};font-style:${el.fontStyle || 'normal'}">${el.content}</div>`;
-      if (el.type === "image") return `<img src="${el.content}" style="${style}object-fit:cover;border-radius:${el.borderRadius || 0}px" alt="" />`;
+      if (el.type === "text") {
+        const inner = `<span style="color:${el.color};font-size:${el.fontSize || 18}px;font-weight:${el.fontWeight || 'normal'};font-style:${el.fontStyle || 'normal'}">${el.content}</span>`;
+        return el.href ? `<a href="${el.href}" target="_blank" style="${style}">${inner}</a>` : `<div style="${style}">${inner}</div>`;
+      }
+      if (el.type === "image") {
+        const img = `<img src="${el.content}" style="${style}object-fit:cover;border-radius:${el.borderRadius || 0}px" alt="" />`;
+        return el.href ? `<a href="${el.href}" target="_blank" style="display:block">${img}</a>` : img;
+      }
       if (el.type === "code") return `<pre style="${style}background:#1E1E1E;color:#4EC9B0;font-family:monospace;font-size:12px;padding:12px;border-radius:8px;overflow:hidden">${el.content}</pre>`;
       if (el.type === "divider") return `<div style="${style}background:${el.color};border-radius:${el.borderRadius || 0}px"></div>`;
       if (el.type === "youtube") return `<div style="${style}background:#000;display:flex;align-items:center;justify-content:center;color:white;font-size:14px">${el.content}</div>`;

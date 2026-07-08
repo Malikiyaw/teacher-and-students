@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 
-const transitionStyles = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes zoomIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}.animate-fadeIn{animation:fadeIn .5s ease-out}.animate-slideIn{animation:slideIn .4s ease-out}.animate-zoomIn{animation:zoomIn .4s ease-out}`;
+const transitionStyles = `@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideIn{from{transform:translateX(80px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes zoomIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}@keyframes morphIn{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:blur(0)}}.animate-fadeIn{animation:fadeIn .5s ease-out}.animate-slideIn{animation:slideIn .4s ease-out}.animate-zoomIn{animation:zoomIn .4s ease-out}.animate-morphIn{animation:morphIn .6s ease-out}`;
 
 interface SlideElement {
   id: string;
@@ -30,13 +30,15 @@ interface SlideElement {
   borderRadius?: number;
   codeLanguage?: string;
   zIndex?: number;
+  href?: string;
+  shapeText?: string;
 }
 interface Slide {
   id: string;
   background: string;
   elements: SlideElement[];
   notes?: string;
-  transition?: string;
+  transition?: "none" | "fade" | "slide" | "zoom" | "morph";
 }
 
 export default function PresentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -277,7 +279,8 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
             className={`w-full max-w-5xl aspect-video shadow-2xl shadow-black/30 flex items-center justify-center relative overflow-hidden rounded-lg ${
               slide.transition === "fade" ? "animate-fadeIn" :
               slide.transition === "slide" ? "animate-slideIn" :
-              slide.transition === "zoom" ? "animate-zoomIn" : ""
+              slide.transition === "zoom" ? "animate-zoomIn" :
+              slide.transition === "morph" ? "animate-morphIn" : ""
             }`}
             style={{ background: slide.background }}>
 
@@ -307,18 +310,35 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
                   width: el.width ?? 200, height: el.height ?? 40,
                 }}>
                 {el.type === "text" ? (
-                  <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}>
-                    {el.content}
-                  </div>
+                  el.href ? (
+                    <a href={el.href} target="_blank" rel="noopener noreferrer"
+                      style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle, textDecoration: "underline" }}>
+                      {el.content}
+                    </a>
+                  ) : (
+                    <div style={{ color: el.color, fontSize: el.fontSize || 18, fontFamily: el.fontFamily || "var(--font-heading)", fontWeight: el.fontWeight, fontStyle: el.fontStyle }}>
+                      {el.content}
+                    </div>
+                  )
                 ) : el.type === "code" ? (
                   <div className="w-full h-full bg-[#1E1E1E] rounded-lg overflow-auto border border-white/10">
                     <pre className="p-3 m-0 font-mono text-xs overflow-auto" style={{ whiteSpace: "pre" }}><code className={`language-${el.codeLanguage || "plaintext"}`}
                       dangerouslySetInnerHTML={{ __html: hljs.highlight(el.content, { language: el.codeLanguage || "plaintext", ignoreIllegals: true }).value }} /></pre>
                   </div>
                 ) : el.type === "image" ? (
-                  <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} />
+                  el.href ? (
+                    <a href={el.href} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                      <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} />
+                    </a>
+                  ) : (
+                    <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover rounded" draggable={false} />
+                  )
                 ) : el.type === "youtube" ? (
                   <iframe src={el.content} className="w-full h-full" allowFullScreen />
+                ) : el.shapeText ? (
+                  <div className="w-full h-full flex items-center justify-center" style={{ background: el.color, borderRadius: el.borderRadius || 0 }}>
+                    <span style={{ color: "#FFFFFF", fontSize: el.fontSize || 14, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{el.shapeText}</span>
+                  </div>
                 ) : (
                   <div className="w-full h-full rounded" style={{ background: el.color, borderRadius: el.borderRadius || 0 }} />
                 )}

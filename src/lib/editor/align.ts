@@ -1,5 +1,6 @@
 export type AlignType = "left" | "center" | "right" | "top" | "middle" | "bottom";
 export type DistributeType = "horizontal" | "vertical";
+export type AlignToSlideType = "slide-left" | "slide-center" | "slide-right" | "slide-top" | "slide-middle" | "slide-bottom";
 
 interface ElementBounds {
   id: string;
@@ -22,6 +23,23 @@ export function alignElements(elements: ElementBounds[], align: AlignType, canva
       case "top": el.y = container.y; break;
       case "middle": el.y = container.y + (container.height - el.height) / 2; break;
       case "bottom": el.y = container.y + container.height - el.height; break;
+    }
+  }
+  return result;
+}
+
+export function alignElementsToSlide(elements: ElementBounds[], align: AlignToSlideType, canvasWidth: number, canvasHeight: number): ElementBounds[] {
+  if (elements.length === 0) return elements;
+  const result = [...elements];
+
+  for (const el of result) {
+    switch (align) {
+      case "slide-left": el.x = 0; break;
+      case "slide-center": el.x = (canvasWidth - el.width) / 2; break;
+      case "slide-right": el.x = canvasWidth - el.width; break;
+      case "slide-top": el.y = 0; break;
+      case "slide-middle": el.y = (canvasHeight - el.height) / 2; break;
+      case "slide-bottom": el.y = canvasHeight - el.height; break;
     }
   }
   return result;

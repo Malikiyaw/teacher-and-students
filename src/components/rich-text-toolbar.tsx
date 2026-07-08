@@ -1,6 +1,6 @@
 "use client";
 
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Minus, Plus } from "lucide-react";
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify, List, ListOrdered, Minus, Plus, IndentIncrease, IndentDecrease } from "lucide-react";
 
 interface RichTextToolbarProps {
   onBold?: () => void;
@@ -11,6 +11,8 @@ interface RichTextToolbarProps {
   onNumberedList?: () => void;
   onFontSize?: (delta: number) => void;
   onFontFamily?: (font: string) => void;
+  onIndent?: () => void;
+  onOutdent?: () => void;
   fontSize?: number;
   fontFamily?: string;
 }
@@ -25,9 +27,9 @@ const fonts = [
   { value: "'Comic Sans MS', cursive", label: "Comic Sans" },
 ];
 
-export default function RichTextToolbar({ onBold, onItalic, onUnderline, onAlign, onBulletList, onNumberedList, onFontSize, onFontFamily, fontSize, fontFamily }: RichTextToolbarProps) {
+export default function RichTextToolbar({ onBold, onItalic, onUnderline, onAlign, onBulletList, onNumberedList, onFontSize, onFontFamily, onIndent, onOutdent, fontSize, fontFamily }: RichTextToolbarProps) {
   return (
-    <div className="flex items-center gap-0.5 px-1 py-1 bg-white/5 rounded-lg border border-white/10">
+    <div className="flex items-center gap-0.5 px-1 py-1 bg-white/5 rounded-lg border border-white/10 flex-wrap">
       <button onClick={onBold} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-all" title="Bold">
         <Bold className="w-3.5 h-3.5" />
       </button>
@@ -53,6 +55,13 @@ export default function RichTextToolbar({ onBold, onItalic, onUnderline, onAlign
       </button>
       <button onClick={onNumberedList} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-all" title="Numbered List">
         <ListOrdered className="w-3.5 h-3.5" />
+      </button>
+      <div className="w-px h-4 bg-white/10 mx-1" />
+      <button onClick={onOutdent} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-all" title="Outdent / Outdent List">
+        <IndentDecrease className="w-3.5 h-3.5" />
+      </button>
+      <button onClick={onIndent} className="p-1.5 text-white/50 hover:text-white hover:bg-white/10 rounded transition-all" title="Indent / Indent List">
+        <IndentIncrease className="w-3.5 h-3.5" />
       </button>
       <div className="w-px h-4 bg-white/10 mx-1" />
       <div className="flex items-center gap-1">
