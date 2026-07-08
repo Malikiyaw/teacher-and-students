@@ -133,6 +133,22 @@ export default function PresentPage({ params }: { params: Promise<{ id: string }
     }
   };
 
+  const toggleLaser = () => {
+    const nextLaser = !laserOn;
+    setLaserOn(nextLaser);
+    if (nextLaser) {
+      setInkOn(false);
+    }
+  };
+
+  const toggleInk = () => {
+    const nextInk = !inkOn;
+    setInkOn(nextInk);
+    if (nextInk) {
+      setLaserOn(false);
+    }
+  };
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
