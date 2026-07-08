@@ -75,6 +75,8 @@ interface SlideElement {
   tableRows?: number;
   tableCols?: number;
   tableData?: string[][];
+  filter?: string;
+  shapeText?: string;
 }
 
 interface Slide {
@@ -222,6 +224,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     flipV: el.flipV ?? undefined,
     gradient: el.gradient ?? undefined,
     highlight: el.highlight ?? undefined,
+    filter: el.filter ?? undefined,
+    shapeText: el.shapeText ?? undefined,
   });
 
   const pushHistory = useCallback((newSlides: Slide[], newActiveSlide?: number) => {
@@ -698,7 +702,20 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           if (result.snapY !== undefined) ny = result.snapY;
         }
 
+        const finalDx = nx - dragState.origX;
+        const finalDy = ny - dragState.origY;
         el.x = nx; el.y = ny;
+
+        // Move grouped elements together by the same delta
+        if (el.groupId) {
+          updated[activeSlide].elements.forEach((ge) => {
+            if (ge.groupId === el.groupId && ge.id !== el.id) {
+              ge.x = Math.max(0, Math.min(720 - ge.width, ge.x + (nx - dragState.origX)));
+              ge.y = Math.max(0, Math.min(405 - ge.height, ge.y + (ny - dragState.origY)));
+            }
+          });
+        }
+
         setSlides(updated);
       }
     };
@@ -828,6 +845,29 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (!el) return;
     updated[activeSlide].elements.splice(fromIndex, 1);
     updated[activeSlide].elements.splice(toIndex, 0, el);
+    updateSlides(updated);
+  };
+
+  const groupElements = () => {
+    const targets = selectedElements.length > 0 ? selectedElements : (activeElement ? [activeElement] : []);
+    if (targets.length < 2) return;
+    const groupId = `group-${Date.now()}`;
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    targets.forEach((id) => {
+      const el = updated[activeSlide].elements.find((e) => e.id === id);
+      if (el) el.groupId = groupId;
+    });
+    updateSlides(updated);
+  };
+
+  const ungroupElements = () => {
+    const targets = selectedElements.length > 0 ? selectedElements : (activeElement ? [activeElement] : []);
+    if (targets.length === 0) return;
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    targets.forEach((id) => {
+      const el = updated[activeSlide].elements.find((e) => e.id === id);
+      if (el) el.groupId = undefined;
+    });
     updateSlides(updated);
   };
 
@@ -978,7 +1018,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               </button>
               {showChartMenu && (
                 <div className="absolute top-full left-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-2 shadow-xl z-50 w-32">
-                  {(["bar", "line", "pie", "donut"] as ChartType[]).map((t) => (
+                  {(["bar", "line", "pie", "donut", "area", "scatter"] as ChartType[]).map((t) => (
                     <button key={t} onClick={() => addChartElement(t)}
                       className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all capitalize">{t} Chart</button>
                   ))}
@@ -1173,7 +1213,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   ) : el.type === "divider" ? (
                     <div className="w-full h-full" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0 }} />
                   ) : el.type === "image" ? (
-                    <div className="w-full h-full overflow-hidden" style={{ borderRadius: el.borderRadius || 0 }}>
+                    <div className="w-full h-full overflow-hidden" style={{ borderRadius: el.borderRadius || 0, filter: el.filter || undefined }}>
                       {el.crop ? (
                         <img src={el.content} alt={el.alt || ""} className="absolute" draggable={false}
                           style={{ left: -el.crop.x, top: -el.crop.y, width: el.crop.width, height: el.crop.height, objectFit: "none" }} />
@@ -1214,14 +1254,25 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       </tbody>
                     </table>
                   ) : el.type === "shape" ? (
-                    <div className="w-full h-full flex items-center justify-center"
-                      style={{ background: el.gradient || "transparent", borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }}
-                      dangerouslySetInnerHTML={{ __html: renderShapeSVG(el) }} />
+                    <div className="w-full h-full flex flex-col items-center justify-center"
+                      style={{ background: el.gradient || "transparent", borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }}>
+                      <div dangerouslySetInnerHTML={{ __html: renderShapeSVG(el) }} className="flex-1 w-full h-full" />
+                      {el.shapeText && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-sm font-medium"
+                          style={{ color: "#FFFFFF", textShadow: "0 1px 4px rgba(0,0,0,0.5)", padding: "4px" }}>
+                          {el.shapeText}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="w-full h-full rounded" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }} />
                   )}
                   {activeElement === el.id && !el.locked && (
                     <>
+                      {/* Group badge */}
+                      {el.groupId && (
+                        <div className="absolute -top-6 right-0 text-[8px] bg-sienna/80 text-white px-1.5 py-0.5 rounded leading-none z-20">Group</div>
+                      )}
                       <div onMouseDown={(e) => handleResizeMouseDown(e, el, "se")}
                         className="absolute bottom-0 right-0 w-3 h-3 bg-sienna rounded-full cursor-se-resize translate-x-1/2 translate-y-1/2 z-10" />
                       <div onMouseDown={(e) => handleResizeMouseDown(e, el, "sw")}
@@ -1252,20 +1303,40 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
           {/* Animation panel (overlay/tray) */}
           {showAnimations && activeEl && (
-            <div className="h-28 bg-[#231F1D] border-t border-white/5 flex flex-col shrink-0">
+            <div className="h-36 bg-[#231F1D] border-t border-white/5 flex flex-col shrink-0">
               <div className="px-4 py-1.5 border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-medium text-white/40">Animation</span>
                 <button onClick={() => { if (activeEl) setAnimation(activeEl.id, null); }} className="text-[10px] text-white/30 hover:text-red-400 transition-colors">Remove</button>
               </div>
-              <div className="flex-1 flex items-center gap-3 px-4 overflow-x-auto">
-                {animationNames.map((a) => (
-                  <button key={a.value} onClick={() => setAnimation(activeEl.id, { type: a.value, duration: 500, delay: 0, easing: "ease-out" })}
-                    className={`text-[11px] px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
-                      activeEl.animation?.type === a.value ? "bg-sienna text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70"
-                    }`}>
-                    {a.label}
-                  </button>
-                ))}
+              <div className="flex-1 flex flex-col justify-center gap-2 px-4">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {animationNames.map((a) => (
+                    <button key={a.value} onClick={() => setAnimation(activeEl.id, { type: a.value, duration: activeEl.animation?.duration || 500, delay: activeEl.animation?.delay || 0, easing: "ease-out" })}
+                      className={`text-[11px] px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                        activeEl.animation?.type === a.value ? "bg-sienna text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70"
+                      }`}>
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                {activeEl.animation && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[10px] text-white/30 w-12">Duration</span>
+                      <input type="range" min="100" max="3000" step="100" value={activeEl.animation.duration}
+                        onChange={(e) => { const v = parseInt(e.target.value); setAnimation(activeEl.id, { ...activeEl.animation!, duration: v }); }}
+                        className="flex-1 accent-sienna h-1" />
+                      <span className="text-[10px] text-white/30 w-10">{activeEl.animation.duration}ms</span>
+                    </div>
+                    <div className="flex-1 flex items-center gap-2">
+                      <span className="text-[10px] text-white/30 w-8">Delay</span>
+                      <input type="range" min="0" max="3000" step="100" value={activeEl.animation.delay}
+                        onChange={(e) => { const v = parseInt(e.target.value); setAnimation(activeEl.id, { ...activeEl.animation!, delay: v }); }}
+                        className="flex-1 accent-sienna h-1" />
+                      <span className="text-[10px] text-white/30 w-10">{activeEl.animation.delay}ms</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1489,6 +1560,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
 
+              {/* Shape text */}
+              {activeEl.type === "shape" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Shape Text</label>
+                  <input type="text" value={activeEl.shapeText || ""} placeholder="Add text on shape"
+                    onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.shapeText = e.target.value || undefined; setSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                </div>
+              )}
+
               {/* Crop for images */}
               {activeEl.type === "image" && (
                 <div>
@@ -1548,7 +1629,32 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
 
-              {/* &lt;img&gt; alt text */}
+              {/* Image filters */}
+              {activeEl.type === "image" && (
+                <div>
+                  <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Image Filter</label>
+                  <select value={activeEl.filter || "none"} onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.filter = e.target.value === "none" ? undefined : e.target.value; updateSlides(u); } }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white/60 outline-none mb-2">
+                    <option value="none">Original</option>
+                    <option value="grayscale(100%)">Grayscale</option>
+                    <option value="sepia(80%)">Sepia</option>
+                    <option value="brightness(120%) contrast(110%)">Bright & Contrast</option>
+                    <option value="brightness(70%)">Darken</option>
+                    <option value="blur(2px)">Blur</option>
+                    <option value="hue-rotate(90deg)">Hue Shift</option>
+                    <option value="saturate(200%)">Saturate</option>
+                    <option value="invert(100%)">Invert</option>
+                  </select>
+                  <div className="grid grid-cols-3 gap-1">
+                    {["none", "grayscale(100%)", "sepia(80%)"].map((f) => (
+                      <button key={f} onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.filter = f === "none" ? undefined : f; updateSlides(u); } }}
+                        className={`text-[10px] py-1.5 rounded transition-all ${(activeEl.filter || "none") === f ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40 hover:text-white/70"}`}>{f === "none" ? "Off" : f === "grayscale(100%)" ? "B&W" : "Sepia"}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Alt text */}
               {activeEl.type === "image" && (
                 <div>
                   <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Alt Text</label>
@@ -1565,6 +1671,17 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   <button onClick={bringToFront} className="flex-1 flex items-center justify-center gap-1 text-[11px] text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg py-1.5 transition-all"><ArrowUp className="w-3 h-3" /> Front</button>
                   <button onClick={sendToBack} className="flex-1 flex items-center justify-center gap-1 text-[11px] text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg py-1.5 transition-all"><ArrowDown className="w-3 h-3" /> Back</button>
                   <button onClick={duplicateElement} className="flex-1 flex items-center justify-center gap-1 text-[11px] text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg py-1.5 transition-all"><Copy className="w-3 h-3" /> Clone</button>
+                </div>
+              </div>
+
+              {/* Group/Ungroup */}
+              <div>
+                <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Group</label>
+                <div className="flex gap-1">
+                  <button onClick={groupElements} disabled={selectedElements.length < 2 && !activeEl?.groupId}
+                    className="flex-1 text-[11px] text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg py-1.5 transition-all disabled:opacity-30">Group</button>
+                  <button onClick={ungroupElements} disabled={!activeEl?.groupId && !currentSlide.elements.some(e => e.groupId)}
+                    className="flex-1 text-[11px] text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 rounded-lg py-1.5 transition-all disabled:opacity-30">Ungroup</button>
                 </div>
               </div>
 

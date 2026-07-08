@@ -1,4 +1,4 @@
-export type ChartType = "bar" | "line" | "pie" | "donut";
+export type ChartType = "bar" | "line" | "pie" | "donut" | "area" | "scatter";
 
 export interface ChartData {
   labels: string[];
@@ -82,5 +82,34 @@ export function renderChartSVG(data: ChartData, type: ChartType, width: number, 
     }).join("");
     return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${slices}</svg>`;
   }
+  if (type === "area") {
+    const points = data.values.map((v, i) => {
+      const x = padding + (i / (data.values.length - 1 || 1)) * chartW;
+      const y = height - padding - (v / maxVal) * chartH;
+      return `${x},${y}`;
+    }).join(" ");
+    const bottom = `${padding + chartW},${height - padding}`;
+    const areaPath = `M${padding + 0},${height - padding} ${points} L${bottom} Z`;
+    const dots = data.values.map((v, i) => {
+      const x = padding + (i / (data.values.length - 1 || 1)) * chartW;
+      const y = height - padding - (v / maxVal) * chartH;
+      return `<circle cx="${x}" cy="${y}" r="4" fill="${data.colors[0]}" stroke="white" stroke-width="2"><title>${data.labels[i]}: ${v}</title></circle>`;
+    }).join("");
+    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <path d="${areaPath}" fill="${data.colors[0]}" opacity="0.3"/>
+      <polyline points="${points}" fill="none" stroke="${data.colors[0]}" stroke-width="3" stroke-linejoin="round"/>
+      ${dots}</svg>`;
+  }
+
+  if (type === "scatter") {
+    const dots = data.values.map((v, i) => {
+      const x = padding + (i / (data.values.length - 1 || 1)) * chartW;
+      const y = height - padding - (v / maxVal) * chartH;
+      const r = 4 + (v / maxVal) * 8;
+      return `<circle cx="${x}" cy="${y}" r="${r}" fill="${data.colors[i % data.colors.length]}" opacity="0.8">
+        <title>${data.labels[i]}: ${v}</title></circle>`;
+    }).join("");
+    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${dots}</svg>`;
+  }
+
   return "";
-}
