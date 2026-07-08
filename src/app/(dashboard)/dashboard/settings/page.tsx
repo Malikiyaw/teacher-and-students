@@ -164,7 +164,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div className="text-sm font-medium text-charcoal">{profile.plan === "pro" ? "Pro Plan" : "Starter Plan"}</div>
-                <div className="text-xs text-charcoal/40">{profile.plan === "pro" ? "$8/month \u2022 Unlimited everything" : "5 presentations \u2022 10 students/room"}</div>
+                <div className="text-xs text-charcoal/40">{profile.plan === "pro" ? "$8/month \u2022 Unlimited everything" : "5 presentations \u2022 Basic exports"}</div>
               </div>
             </div>
             {profile.plan !== "pro" ? (

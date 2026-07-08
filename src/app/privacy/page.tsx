@@ -11,9 +11,9 @@ export default function PrivacyPage() {
         <div className="prose prose-charcoal space-y-6 text-sm text-charcoal/60 leading-relaxed">
           <p><strong>Last updated:</strong> June 25, 2026</p>
           <h2 className="font-heading text-xl text-charcoal">Information We Collect</h2>
-          <p>We collect your name, email address, and role (teacher/student) when you create an account. We also collect presentation data, quiz responses, and poll votes you create or submit.</p>
+          <p>We collect your name and email address when you create an account. We also collect presentation data you create or upload.</p>
           <h2 className="font-heading text-xl text-charcoal">How We Use Your Information</h2>
-          <p>We use your information to provide the ClassDeck service, including creating presentations, running quizzes, tracking engagement, and processing payments for Pro subscriptions.</p>
+          <p>We use your information to provide the ClassDeck service, including creating and storing presentations, and processing payments for Pro subscriptions.</p>
           <h2 className="font-heading text-xl text-charcoal">Data Storage</h2>
           <p>All data is stored securely using Supabase (PostgreSQL database with row-level security). File uploads are stored in Supabase Storage. Payment processing is handled by Stripe.</p>
           <h2 className="font-heading text-xl text-charcoal">Data Sharing</h2>

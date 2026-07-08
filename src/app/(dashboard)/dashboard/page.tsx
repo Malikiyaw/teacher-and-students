@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Presentation,
-  Users,
   Clock,
   ArrowRight,
   BarChart3,
@@ -27,7 +26,6 @@ export default function TeacherDashboard() {
   const [presentations, setPresentations] = useState<PresentationItem[]>([]);
   const [stats, setStats] = useState({
     totalPresentations: 0,
-    totalRooms: 0,
   });
   const supabase = createClient();
 
@@ -57,11 +55,7 @@ export default function TeacherDashboard() {
         setStats((s) => ({ ...s, totalPresentations: pres.length }));
       }
 
-      const { count } = await supabase
-        .from("rooms")
-        .select("*", { count: "exact", head: true })
-        .eq("teacher_id", user.id);
-      setStats((s) => ({ ...s, totalRooms: count || 0 }));
+
     };
     fetchData();
   }, [supabase, router]);
@@ -93,12 +87,12 @@ export default function TeacherDashboard() {
           {getGreeting()}, {firstName}
         </h1>
         <p className="text-sm text-charcoal/45">
-          You have {stats.totalRooms} room{stats.totalRooms !== 1 ? "s" : ""} and {stats.totalPresentations} presentation{stats.totalPresentations !== 1 ? "s" : ""}.
+          You have {stats.totalPresentations} presentation{stats.totalPresentations !== 1 ? "s" : ""}.
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-12">
+        <div className="grid sm:grid-cols-2 gap-4 mb-12">
         <div className="bg-white border border-border rounded-xl p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
@@ -108,17 +102,6 @@ export default function TeacherDashboard() {
           </div>
           <div className="font-heading text-3xl text-charcoal">
             {stats.totalPresentations}
-          </div>
-        </div>
-        <div className="bg-white border border-border rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 bg-sienna/8 rounded-lg flex items-center justify-center">
-              <Users className="w-4 h-4 text-sienna" />
-            </div>
-            <span className="text-xs text-charcoal/40 font-medium">Rooms Created</span>
-          </div>
-          <div className="font-heading text-3xl text-charcoal">
-            {stats.totalRooms}
           </div>
         </div>
         <div className="bg-white border border-border rounded-xl p-5">
@@ -135,7 +118,7 @@ export default function TeacherDashboard() {
       {/* Quick Actions */}
       <div className="mb-12">
         <h2 className="font-heading text-xl text-charcoal mb-5">Quick Actions</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <Link
             href="/editor/new"
             className="flex items-center gap-4 bg-sienna text-white p-5 rounded-xl hover:bg-sienna-dark transition-all duration-300 cubic-bezier(0.25, 0.8, 0.25, 1) hover:shadow-lg hover:shadow-sienna/15 group"
@@ -146,18 +129,6 @@ export default function TeacherDashboard() {
             <div>
               <div className="text-sm font-medium">New Presentation</div>
               <div className="text-xs text-white/60">Start from scratch</div>
-            </div>
-          </Link>
-          <Link
-            href="/dashboard/rooms/new"
-            className="flex items-center gap-4 bg-white border border-border p-5 rounded-xl hover:border-charcoal/20 transition-all duration-300 group"
-          >
-            <div className="w-10 h-10 bg-charcoal/5 rounded-lg flex items-center justify-center group-hover:bg-charcoal/8 transition-colors">
-              <Users className="w-5 h-5 text-charcoal/50" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-charcoal">Start a Room</div>
-              <div className="text-xs text-charcoal/40">Students join with code</div>
             </div>
           </Link>
           <Link

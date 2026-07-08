@@ -7,8 +7,6 @@ import {
   Presentation,
   LayoutDashboard,
   FolderOpen,
-  Users,
-  BarChart3,
   Settings,
   LogOut,
   Menu,
@@ -16,20 +14,16 @@ import {
   Plus,
   PenTool,
   Bell,
-  BookOpen,
-  UserSearch,
+  Layout,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/presentations", label: "Presentations", icon: Presentation },
-  { href: "/dashboard/rooms", label: "Rooms", icon: Users },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/gradebook", label: "Gradebook", icon: BookOpen },
-  { href: "/dashboard/students", label: "Students", icon: UserSearch },
+  { href: "/dashboard/templates", label: "Templates", icon: Layout },
   { href: "/dashboard/files", label: "Files", icon: FolderOpen },
-  { href: "/dashboard/tools", label: "Classroom Tools", icon: PenTool },
+  { href: "/dashboard/tools", label: "Tools", icon: PenTool },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

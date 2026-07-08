@@ -2,17 +2,24 @@ import Link from "next/link";
 import Navbar from "@/components/navbar";
 import {
   Presentation,
-  Users,
-  BarChart3,
-  Timer,
-  Vote,
-  Brain,
   PenTool,
-  Share2,
+  Shapes,
+  BarChart3,
+  Image,
+  Code2,
+  QrCode,
+  Sparkles,
+  Download,
+  Layers,
+  Type,
+  Palette,
+  Video,
+  Table,
   Zap,
   ArrowRight,
   Check,
-  Sparkles,
+  GraduationCap,
+  School,
 } from "lucide-react";
 
 export default function Home() {
@@ -31,22 +38,21 @@ export default function Home() {
               <div className="inline-flex items-center gap-2 bg-sienna/8 border border-sienna/15 rounded-full px-4 py-1.5 mb-8">
                 <Sparkles className="w-3.5 h-3.5 text-sienna" />
                 <span className="text-xs font-medium text-sienna tracking-wide uppercase">
-                  Built for real classrooms
+                  The most powerful presentation studio
                 </span>
               </div>
 
               <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl xl:text-[5.5rem] text-charcoal leading-[1.05] tracking-tight mb-8">
-                Presentations
+                Canva + PowerPoint.
                 <br />
-                that actually
-                <br />
-                <span className="text-sienna">engage.</span>
+                <span className="text-sienna">Ours is better.</span>
               </h1>
 
               <p className="text-lg lg:text-xl text-charcoal/55 max-w-xl leading-relaxed mb-10">
-                The slide deck tool teachers and students actually want to use.
-                Create, present, and interact in real-time — no cable fights,
-                no login hassles, no bore.
+                A presentation studio built for students and teachers — with more
+                tools, more freedom, and zero limits. Design any slide, add any
+                element, and export anywhere. The most capable presentation
+                platform on earth.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
@@ -58,11 +64,17 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
-                  href="/#how-it-works"
+                  href="/#tools"
                   className="inline-flex items-center justify-center gap-2 text-sm font-medium text-charcoal/60 px-7 py-3.5 rounded-xl border border-border hover:border-charcoal/20 hover:text-charcoal transition-all duration-300"
                 >
-                  See How It Works
+                  See Every Tool
                 </Link>
+              </div>
+
+              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-charcoal/35 font-medium">
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-sienna" /> 50+ slide elements</span>
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-sienna" /> Export to PPTX, PDF, PNG, HTML</span>
+                <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-sienna" /> No design limits</span>
               </div>
             </div>
 
@@ -74,7 +86,7 @@ export default function Home() {
                     <div className="w-2.5 h-2.5 rounded-full bg-[#CA8A04]/80" />
                     <div className="w-2.5 h-2.5 rounded-full bg-[#16A34A]/80" />
                     <span className="ml-3 text-xs text-white/30 font-medium">
-                      presenter-mode.classdeck.app
+                      studio.classdeck.app
                     </span>
                   </div>
                   <div className="flex-1 flex items-center justify-center">
@@ -91,9 +103,9 @@ export default function Home() {
                     <span className="text-xs text-white/25">Slide 3 of 18</span>
                     <div className="flex items-center gap-3">
                       <div className="bg-sienna/20 text-sienna text-xs px-3 py-1 rounded-full font-medium">
-                        Live Poll Active
+                        Chart • Code • QR
                       </div>
-                      <div className="text-white/25 text-xs">14 joined</div>
+                      <div className="text-white/25 text-xs">Auto-saved</div>
                     </div>
                   </div>
                 </div>
@@ -102,14 +114,14 @@ export default function Home() {
               {/* Floating badge */}
               <div className="absolute -bottom-4 -left-6 bg-white rounded-xl shadow-lg shadow-charcoal/8 border border-border px-4 py-3 flex items-center gap-3">
                 <div className="w-10 h-10 bg-sienna/10 rounded-lg flex items-center justify-center">
-                  <Vote className="w-5 h-5 text-sienna" />
+                  <Layers className="w-5 h-5 text-sienna" />
                 </div>
                 <div>
                   <div className="text-xs font-medium text-charcoal">
-                    12 votes received
+                    18 elements on slide
                   </div>
                   <div className="text-[11px] text-charcoal/40">
-                    Poll closes in 0:34
+                    Fully editable layers
                   </div>
                 </div>
               </div>
@@ -117,14 +129,14 @@ export default function Home() {
               {/* Floating badge 2 */}
               <div className="absolute -top-3 -right-4 bg-white rounded-xl shadow-lg shadow-charcoal/8 border border-border px-4 py-3 flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#16A34A]/10 rounded-lg flex items-center justify-center">
-                  <Users className="w-5 h-5 text-[#16A34A]" />
+                  <Download className="w-5 h-5 text-[#16A34A]" />
                 </div>
                 <div>
                   <div className="text-xs font-medium text-charcoal">
-                    Room active
+                    Exported to PPTX
                   </div>
                   <div className="text-[11px] text-charcoal/40">
-                    28 students connected
+                    Opens in PowerPoint
                   </div>
                 </div>
               </div>
@@ -156,9 +168,9 @@ export default function Home() {
               Everything you need
             </span>
             <h2 className="font-heading text-4xl lg:text-5xl text-charcoal tracking-tight leading-tight">
-              Tools that make
+              More tools than any
               <br />
-              teaching sharper.
+              other platform.
             </h2>
           </div>
 
@@ -166,48 +178,63 @@ export default function Home() {
             {[
               {
                 icon: PenTool,
-                title: "Visual Slide Editor",
-                desc: "Drag, drop, design. Add text, images, shapes, and backgrounds without fighting your software.",
+                title: "Deep Slide Editor",
+                desc: "Drag, drop, and design any layout. Resize, rotate, layer, and align with smart snap guides. Nothing is off-limits.",
               },
               {
-                icon: Presentation,
-                title: "Presenter Mode",
-                desc: "Fullscreen presenting with speaker notes, laser pointer, and keyboard navigation.",
-              },
-              {
-                icon: Vote,
-                title: "Live Polls",
-                desc: "Launch a poll mid-presentation. Students vote on their phones. Results update in real-time.",
-              },
-              {
-                icon: Brain,
-                title: "Interactive Quizzes",
-                desc: "Multiple choice, true/false, timed challenges. Auto-scored with instant leaderboards.",
-              },
-              {
-                icon: Timer,
-                title: "Countdown Timer",
-                desc: "Set timed activities with audible alerts. Perfect for group work and exams.",
-              },
-              {
-                icon: Users,
-                title: "Room System",
-                desc: "Teachers create rooms, students join with a code. No emails, no friction.",
-              },
-              {
-                icon: Share2,
-                title: "Instant Sharing",
-                desc: "Share a link or code. Anyone can view presentations without creating an account.",
+                icon: Shapes,
+                title: "Shapes & Icons",
+                desc: "Hundreds of shapes, lines, dividers, and a full icon library. Build diagrams and visuals in seconds.",
               },
               {
                 icon: BarChart3,
-                title: "Analytics",
-                desc: "Track engagement, quiz scores, and participation across your classes.",
+                title: "Charts",
+                desc: "Bar, line, pie, and area charts that update live as you edit the data. Presentation-ready every time.",
               },
               {
-                icon: Zap,
-                title: "Real-time Collab",
-                desc: "Multiple editors on the same deck. See changes live. No merge conflicts.",
+                icon: Image,
+                title: "Images & Uploads",
+                desc: "Upload your own assets, drop in images, and arrange them freely on the canvas with crop and layering.",
+              },
+              {
+                icon: Code2,
+                title: "Code Blocks",
+                desc: "Paste code with syntax highlighting in 190+ languages. Perfect for CS lessons and technical talks.",
+              },
+              {
+                icon: QrCode,
+                title: "QR Codes",
+                desc: "Generate scannable QR codes on any slide that link to resources, forms, or assignments.",
+              },
+              {
+                icon: Video,
+                title: "Embed Anything",
+                desc: "Drop in YouTube videos, iframes, and rich media directly onto your slides.",
+              },
+              {
+                icon: Table,
+                title: "Tables",
+                desc: "Full tables with styling, merges, and alignment — not clunky text boxes pretending to be tables.",
+              },
+              {
+                icon: Type,
+                title: "Typography",
+                desc: "Rich text, custom fonts, weights, and styles. A real rich-text toolbar, not a single text box.",
+              },
+              {
+                icon: Palette,
+                title: "Color & Themes",
+                desc: "A full color picker, custom palettes, and theme tokens so every deck looks intentional.",
+              },
+              {
+                icon: Layers,
+                title: "Layers Panel",
+                desc: "Manage every element like a pro design tool. Reorder, hide, lock, and group with a layers panel.",
+              },
+              {
+                icon: Download,
+                title: "Universal Exports",
+                desc: "Export to PowerPoint (PPTX), PDF, standalone interactive HTML, or PNG images. Yours to keep.",
               },
             ].map((feature, i) => (
               <div
@@ -247,7 +274,7 @@ export default function Home() {
               </h2>
               <p className="text-charcoal/50 leading-relaxed">
                 ClassDeck works the way your brain does — pick a template, add
-                your content, share with the room. That&apos;s it.
+                your content, present or export. That&apos;s it.
               </p>
             </div>
 
@@ -256,17 +283,17 @@ export default function Home() {
                 {
                   step: "01",
                   title: "Create your deck",
-                  desc: "Pick a template or start blank. Add slides, images, text. The editor does what you expect — nothing fancy, nothing frustrating.",
+                  desc: "Pick a template or start blank. Add slides, images, text, charts, code, and anything else. The editor does what you expect — nothing fancy, nothing frustrating.",
                 },
                 {
                   step: "02",
-                  title: "Start a room",
-                  desc: "Click 'Present' and get a room code. Students enter it on their phones. No accounts needed on their end.",
+                  title: "Design without limits",
+                  desc: "Use the full toolkit: shapes, icons, QR codes, tables, embeds, animations, and a layers panel. Build whatever you imagine.",
                 },
                 {
                   step: "03",
-                  title: "Engage and measure",
-                  desc: "Launch polls, quizzes, timers. Watch responses come in live. Review analytics after class to see who's keeping up.",
+                  title: "Present or export",
+                  desc: "Present in fullscreen with speaker notes, or export to PPTX, PDF, HTML, or images to use anywhere.",
                 },
               ].map((item, i) => (
                 <div key={item.step} className="relative pl-16">
@@ -302,16 +329,16 @@ export default function Home() {
                 For Teachers
               </span>
               <h3 className="font-heading text-3xl mb-6 leading-snug">
-                Stop fighting
+                Lessons that
                 <br />
-                the projector.
+                actually land.
               </h3>
               <ul className="space-y-4">
                 {[
-                  "Create and reuse presentation templates",
-                  "Launch live polls without leaving your slides",
-                  "See which students are engaged (and which aren't)",
-                  "Auto-grade quizzes, skip the paperwork",
+                  "Build rich, beautiful lesson decks fast",
+                  "Use charts, code, diagrams, and embeds",
+                  "Reuse templates across every class",
+                  "Export to PPTX for any classroom setup",
                   "No IT support needed — it just works",
                 ].map((item) => (
                   <li
@@ -331,16 +358,16 @@ export default function Home() {
                 For Students
               </span>
               <h3 className="font-heading text-3xl text-charcoal mb-6 leading-snug">
-                Actually pay attention
+                Projects that
                 <br />
-                in class.
+                stand out.
               </h3>
               <ul className="space-y-4">
                 {[
-                  "Join any class with a simple code",
-                  "Answer polls and quizzes from your phone",
-                  "Download presentation slides after class",
-                  "Track your own quiz scores and progress",
+                  "Create presentations that look pro",
+                  "Add charts, code, and media with ease",
+                  "Organize slides with a real layers panel",
+                  "Export to PPTX, PDF, or images",
                   "No app download — works in any browser",
                 ].map((item) => (
                   <li
@@ -386,16 +413,15 @@ export default function Home() {
                 <span className="text-sm text-charcoal/40">/month</span>
               </div>
               <p className="text-sm text-charcoal/50 mb-8">
-                Everything a solo teacher needs to get started.
+                Everything a student or teacher needs to get started.
               </p>
               <ul className="space-y-3.5 mb-10">
                 {[
                   "5 presentations",
-                  "Basic templates",
-                  "Live polls & quizzes",
-                  "Room system (10 students)",
-                  "Presenter mode",
-                  "Timer & name picker",
+                  "Full editing toolkit",
+                  "Templates library",
+                  "Export to PPTX, PDF, PNG",
+                  "Present mode with notes",
                 ].map((item) => (
                   <li
                     key={item}
@@ -426,19 +452,18 @@ export default function Home() {
                   $8
                 </span>
                 <span className="text-sm text-charcoal/40">
-                  /month per teacher
+                  /month per user
                 </span>
               </div>
               <p className="text-sm text-charcoal/50 mb-8">
-                Unlimited everything. For serious educators.
+                Unlimited everything. For serious creators.
               </p>
               <ul className="space-y-3.5 mb-10">
                 {[
                   "Unlimited presentations",
                   "Premium templates",
-                  "Rooms up to 100 students",
-                  "Analytics dashboard",
-                  "Quiz leaderboards",
+                  "Interactive HTML exports",
+                  "Advanced charts & embeds",
                   "Priority support",
                   "Custom branding",
                 ].map((item) => (
@@ -468,13 +493,13 @@ export default function Home() {
           <div className="bg-charcoal rounded-3xl p-12 lg:p-20 text-center relative overflow-hidden">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-sienna/10 rounded-full blur-3xl pointer-events-none" />
             <h2 className="font-heading text-4xl lg:text-5xl text-white tracking-tight mb-6 relative">
-              Ready to ditch the
+              Ready to make slides
               <br />
-              boring slides?
+              that actually impress?
             </h2>
             <p className="text-white/45 max-w-lg mx-auto mb-10 relative">
-              Join thousands of teachers already using ClassDeck to make their
-              presentations something students actually look forward to.
+              Join thousands of students and teachers already using ClassDeck to
+              build presentations better than anywhere else.
             </p>
             <Link
               href="/signup"

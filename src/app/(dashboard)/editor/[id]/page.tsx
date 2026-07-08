@@ -774,7 +774,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   };
 
   const generateShareLink = () => {
-    setShareLink(`${window.location.origin}/present/view/${presentationId}`);
+    setShareLink(`${window.location.origin}/present/${presentationId}`);
     setShowShare(true);
   };
 
@@ -1275,7 +1275,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <div className="h-28 bg-[#231F1D] border-t border-white/5 flex flex-col shrink-0">
               <div className="px-4 py-1.5 border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-medium text-white/40">Speaker Notes</span>
-                <span className="text-[10px] text-white/20">Not visible to students</span>
+                <span className="text-[10px] text-white/20">Private speaker notes</span>
               </div>
               <textarea value={currentSlide.notes || ""} placeholder="Add notes for this slide..."
                 onChange={(e) => { const updated = JSON.parse(JSON.stringify(slides)) as Slide[]; updated[activeSlide].notes = e.target.value; setSlides(updated); }}

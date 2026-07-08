@@ -1,27 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { Vote, Brain, Timer, PenTool, ArrowRight, Cloud, MessageSquareText, Users, BarChart3, BookOpen, UserSearch, Layout } from "lucide-react";
+import { Layout, PenTool, Image, Code2, Shapes, Palette, ArrowRight } from "lucide-react";
 
 const tools = [
-  { icon: Vote, title: "Create Poll", desc: "Ask a question, get instant votes from your students in real-time.", href: "/dashboard/poll", color: "bg-sienna" },
-  { icon: Brain, title: "Create Quiz", desc: "Build multiple-choice quizzes with auto-scoring and leaderboards.", href: "/dashboard/quiz", color: "bg-charcoal" },
-  { icon: Cloud, title: "Word Cloud", desc: "Students submit words, see a live word cloud form in real-time.", href: "/dashboard/wordcloud", color: "bg-[#2563EB]" },
-  { icon: MessageSquareText, title: "Exit Ticket", desc: "Quick end-of-class feedback to gauge student understanding.", href: "/dashboard/exit-ticket", color: "bg-[#16A34A]" },
-  { icon: PenTool, title: "Whiteboard", desc: "Freehand drawing, shapes, colors, and export. Save & share.", href: "/dashboard/whiteboard", color: "bg-[#7C3AED]" },
-  { icon: Users, title: "Attendance", desc: "Track who joined each room session automatically. Export CSV.", href: "/dashboard/attendance", color: "bg-[#CA8A04]" },
-  { icon: BarChart3, title: "Analytics", desc: "View class-wide performance, engagement, and trends.", href: "/dashboard/analytics", color: "bg-[#06B6D4]" },
-  { icon: BookOpen, title: "Gradebook", desc: "Track student scores across quizzes with letter grades and CSV export.", href: "/dashboard/gradebook", color: "bg-[#EA580C]" },
-  { icon: UserSearch, title: "Students", desc: "View all students across your rooms with performance data.", href: "/dashboard/students", color: "bg-[#0891B2]" },
   { icon: Layout, title: "Templates", desc: "Start from a professionally designed presentation template.", href: "/dashboard/templates", color: "bg-[#4F46E5]" },
+  { icon: PenTool, title: "Whiteboard", desc: "Freehand drawing, shapes, colors, and export. Save & share.", href: "/dashboard/whiteboard", color: "bg-[#7C3AED]" },
+  { icon: Image, title: "Upload Assets", desc: "Upload images and media to use across your presentations.", href: "/dashboard/files", color: "bg-[#16A34A]" },
+  { icon: Shapes, title: "Shapes & Icons", desc: "Built into the editor — hundreds of shapes and icons ready to drag in.", href: "/editor/new", color: "bg-[#2563EB]" },
+  { icon: Code2, title: "Code Blocks", desc: "Syntax-highlighted code in 190+ languages. Perfect for CS lessons.", href: "/editor/new", color: "bg-charcoal" },
+  { icon: Palette, title: "Color & Themes", desc: "Set custom themes and palettes that apply across your entire deck.", href: "/dashboard/templates", color: "bg-[#EA580C]" },
 ];
 
 export default function ToolsPage() {
   return (
     <div className="max-w-6xl">
       <div className="mb-10">
-        <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">Classroom Tools</h1>
-        <p className="text-sm text-charcoal/45">Interactive tools to engage your students during presentations.</p>
+        <h1 className="font-heading text-3xl text-charcoal tracking-tight mb-1">Presentation Tools</h1>
+        <p className="text-sm text-charcoal/45">Everything you need to build stunning presentations.</p>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {tools.map((tool) => (

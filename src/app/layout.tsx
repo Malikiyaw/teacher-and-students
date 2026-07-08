@@ -18,7 +18,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ClassDeck — Where Presentations Come Alive",
   description:
-    "A presentation platform built for classrooms. Create, present, and engage students with real-time polls, quizzes, and collaborative tools.",
+    "The most powerful presentation platform for students and teachers. Design beautiful slides with charts, code, shapes, and more. Export anywhere.",
 };
 
 export default function RootLayout({
