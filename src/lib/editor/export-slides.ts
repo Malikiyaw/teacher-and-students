@@ -4,7 +4,7 @@ import { toPng } from "html-to-image";
 interface ExportElement {
   type: string; x: number; y: number; width: number; height: number;
   content: string; color: string; fontSize?: number; fontWeight?: string;
-  fontStyle?: string; borderRadius?: number;
+  fontStyle?: string; borderRadius?: number; href?: string;
 }
 
 interface ExportSlide { background: string; elements: ExportElement[]; }

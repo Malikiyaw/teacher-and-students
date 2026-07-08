@@ -1517,8 +1517,10 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 })}
               </defs>
             </svg>
+            </div>{/* end canvas ref div */}
               </div>{/* end left-ruler + canvas flex row */}
             </div>{/* end top-ruler flex-col wrapper */}
+          </div>{/* end canvas centering div */}
 
           {/* Animation panel (overlay/tray) */}
           {showAnimations && activeEl && (
