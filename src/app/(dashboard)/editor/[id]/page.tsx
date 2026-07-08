@@ -10,7 +10,10 @@ import {
   Code, Minus, Download, Globe, History, AlignLeft, AlignCenter,
   AlignRight, AlignJustify, AlignStartVertical, AlignEndVertical,
   LayoutGrid, Lock, Unlock, Eye, EyeOff, GripVertical, Sparkles,
-  ChartBar, QrCode, Shapes, Expand,
+  ChartBar, QrCode, Shapes, Expand, Presentation,
+  Video, Music, Film, Upload, LayoutTemplate, Wand2, Layout, List,
+  FileUp, FileDown, FileVideo, FileImage, FileText,
+  Sigma, Workflow, CheckCheck, AlertTriangle, Puzzle, Command, Keyboard,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { presentationToHTML, downloadHTML } from "@/lib/export";
@@ -23,15 +26,37 @@ import { alignElements, alignElementsToSlide, distributeElements, findSnapGuides
 import { generateDefaultChartData, renderChartSVG, type ChartType, type ChartData } from "@/lib/editor/charts";
 import { iconLibrary, searchIcons, getIconSVG, type IconDef } from "@/lib/editor/icons";
 import { generateQR } from "@/lib/editor/qr";
-import { getAnimationCSS, getAllAnimationCSS, animationNames, type AnimationType, type AnimationDef } from "@/lib/editor/animate";
+import { getAnimationCSS, getAllAnimationCSS, animationNames, easingOptions, directionOptions, fillModeOptions, type AnimationType, type AnimationDef } from "@/lib/editor/animate";
+import { sequencifyAnimations, getTimelineCSS, getTotalDuration } from "@/lib/editor/animation-timeline";
+import { generateMotionPath, getMotionPathCSS, MotionPathEditor, type MotionPath } from "@/lib/editor/motion-paths";
 import { exportToPDF, exportToPPTX, exportSlideAsPNG } from "@/lib/editor/export-slides";
+import { parsePPTXFile } from "@/lib/editor/import-pptx";
+import { parseMarkdown } from "@/lib/editor/import-markdown";
+import { parseSVGFile } from "@/lib/editor/import-svg";
+import { exportAsVideoHTML, openVideoPlayer } from "@/lib/editor/export-video";
+import { exportAsGIF } from "@/lib/editor/export-gif";
+import { importFromGoogleSlides } from "@/lib/editor/import-google-slides";
+import { exportToMarkdown, downloadMarkdown, copyMarkdownToClipboard } from "@/lib/editor/export-markdown";
 import { searchUnsplash } from "@/lib/editor/unsplash";
+import { generateSlidesFromPrompt, generateSlideContent } from "@/lib/editor/ai-slides";
+import { generateImage, getStyleOptions } from "@/lib/editor/ai-images";
+import { autoArrangeElements, autoSizeText, suggestLayout } from "@/lib/editor/smart-layout";
+import { BackgroundRemoverModal } from "@/lib/editor/background-remover";
+import { createCustomShow, saveCustomShow, loadCustomShows, type CustomSlideShow } from "@/lib/editor/custom-slide-show";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
+import LatexEditorModal, { renderLatexToSVG, preloadKaTeX } from "@/lib/editor/latex";
+import MermaidEditorModal, { MermaidPreview } from "@/lib/editor/mermaid";
+import { SpellCheckPanel, checkSpelling, checkGrammar } from "@/lib/editor/spell-check";
+import { AccessibilityPanel, checkAccessibility, getContrastRatio, meetsWCAGAA, type A11yIssue } from "@/lib/editor/accessibility-checker";
+import { CommandPalette, buildCommandList } from "@/lib/editor/command-palette";
+import { themePresets as customThemePresets, applyThemeToSlides, CustomThemeEditor, type CustomTheme, loadCustomThemes, saveCustomThemes } from "@/lib/editor/custom-themes";
+import { loadShortcuts, saveShortcuts, ShortcutCustomizer } from "@/lib/editor/shortcuts";
+import { pluginRegistry, defaultPlugins, PluginManager, usePluginWordCount, usePluginSlideTimes } from "@/lib/editor/plugin-system";
 
 interface SlideElement {
   id: string;
-  type: "text" | "image" | "shape" | "code" | "divider" | "youtube" | "line" | "table";
+  type: "text" | "image" | "shape" | "code" | "divider" | "youtube" | "line" | "table" | "video" | "audio" | "gif" | "latex" | "mermaid";
   x: number;
   y: number;
   width: number;
@@ -58,6 +83,7 @@ interface SlideElement {
   textDecoration?: string;
   textAlign?: "left" | "center" | "right" | "justify";
   animation?: AnimationDef;
+  animations?: AnimationDef[];
   strokeColor?: string;
   strokeWidth?: number;
   strokeDash?: string;
@@ -89,6 +115,15 @@ interface SlideElement {
   saturation?: number;
   tableHeaderBg?: string;
   tableRowAlt?: string;
+  autoPlay?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+  controls?: boolean;
+  speed?: number;
+  svgContent?: string;
+  maintainAspectRatio?: boolean;
+  colorOverride?: string;
+  collageTemplate?: string;
 }
 
 interface Slide {
@@ -177,6 +212,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showAlignTools, setShowAlignTools] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showImportMenu, setShowImportMenu] = useState(false);
   const [iconSearch, setIconSearch] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [title, setTitle] = useState("Untitled Presentation");
@@ -202,6 +238,13 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const supabase = createClient();
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const animStyleRef = useRef<HTMLStyleElement | null>(null);
+  const previewStyleRef = useRef<HTMLStyleElement | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [showMotionPath, setShowMotionPath] = useState(false);
+  const [showSpellCheck, setShowSpellCheck] = useState(false);
+  const [showAccessibility, setShowAccessibility] = useState(false);
+  const [a11yIssues, setA11yIssues] = useState<A11yIssue[]>([]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -212,6 +255,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [versionHistory, setVersionHistory] = useState<{ slides: Slide[]; title: string; saved_at: string }[]>([]);
   const [showVersions, setShowVersions] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showCustomThemeEditor, setShowCustomThemeEditor] = useState(false);
+  const [showShortcutCustomizer, setShowShortcutCustomizer] = useState(false);
+  const [showPluginManager, setShowPluginManager] = useState(false);
+  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const [slideClipboard, setSlideClipboard] = useState<SlideElement[] | null>(null);
   const [selectedSlides, setSelectedSlides] = useState<Set<number>>(new Set());
@@ -225,8 +273,49 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
   const [chartEditorData, setChartEditorData] = useState<{ labels: string[]; values: number[]; colors: string[] } | null>(null);
   const [connectorMode, setConnectorMode] = useState(false);
   const [connectorSource, setConnectorSource] = useState<string | null>(null);
+  const [showVideoDialog, setShowVideoDialog] = useState(false);
+  const [showAudioDialog, setShowAudioDialog] = useState(false);
+  const [showGIFDialog, setShowGIFDialog] = useState(false);
+  const [showUploadMenu, setShowUploadMenu] = useState(false);
+  const [showCollageDialog, setShowCollageDialog] = useState(false);
+  const [showLatexEditor, setShowLatexEditor] = useState(false);
+  const [showMermaidEditor, setShowMermaidEditor] = useState(false);
+  const [editingLatexId, setEditingLatexId] = useState<string | null>(null);
+  const [editingMermaidId, setEditingMermaidId] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
+  const [gifUrl, setGifUrl] = useState("");
+  const [showCustomShow, setShowCustomShow] = useState(false);
+  const [customShows, setCustomShows] = useState<CustomSlideShow[]>([]);
+  const [customShowName, setCustomShowName] = useState("");
+  const [selectedCustomIndices, setSelectedCustomIndices] = useState<Set<number>>(new Set());
+  const [showAIGenerate, setShowAIGenerate] = useState(false);
+  const [showAIImage, setShowAIImage] = useState(false);
+  const [showBackgroundRemover, setShowBackgroundRemover] = useState(false);
+  const [aiGenerateTopic, setAiGenerateTopic] = useState("");
+  const [aiGenerateCount, setAiGenerateCount] = useState(5);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGeneratedSlides, setAiGeneratedSlides] = useState<any[]>([]);
+  const [aiImagePrompt, setAiImagePrompt] = useState("");
+  const [aiImageStyle, setAiImageStyle] = useState("photorealistic");
+  const [aiImageGenerating, setAiImageGenerating] = useState(false);
+  const [aiGeneratedImage, setAiGeneratedImage] = useState("");
 
   const currentSlide = slides[activeSlide];
+
+  useEffect(() => {
+    if (showAccessibility && currentSlide) {
+      const issues = checkAccessibility(currentSlide as any, (elId, changes) => {
+        setSlides(prev => {
+          const next = JSON.parse(JSON.stringify(prev)) as Slide[];
+          const el = next[activeSlide].elements.find((x: SlideElement) => x.id === elId);
+          if (el) Object.assign(el, changes);
+          return next;
+        });
+      });
+      setA11yIssues(issues);
+    }
+  }, [showAccessibility, currentSlide, activeSlide]);
 
   const initElement = (el: SlideElement): SlideElement => ({
     ...el,
@@ -261,6 +350,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     saturation: el.saturation ?? undefined,
     tableHeaderBg: el.tableHeaderBg ?? undefined,
     tableRowAlt: el.tableRowAlt ?? undefined,
+    autoPlay: el.autoPlay ?? undefined,
+    loop: el.loop ?? undefined,
+    muted: el.muted ?? undefined,
+    controls: el.controls ?? undefined,
+    speed: el.speed ?? undefined,
+    svgContent: el.svgContent ?? undefined,
+    maintainAspectRatio: el.maintainAspectRatio ?? undefined,
+    colorOverride: el.colorOverride ?? undefined,
+    collageTemplate: el.collageTemplate ?? undefined,
   });
 
   const pushHistory = useCallback((newSlides: Slide[], newActiveSlide?: number) => {
@@ -295,21 +393,63 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     pushHistory(newSlides, newActiveSlide);
   }, [pushHistory]);
 
+  const autoSave = useCallback(async () => {
+    if (presentationId === "new") return;
+    setSaving(true);
+    await supabase.from("presentations").update({ title, slides, updated_at: new Date().toISOString() }).eq("id", presentationId);
+    setSaving(false);
+    setLastSaved(new Date());
+  }, [presentationId, title, slides, supabase]);
+
   useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(autoSave, 2000);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [slides, title, autoSave]);
+
+  useEffect(() => {
+    const shortcuts = loadShortcuts();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) { e.preventDefault(); redo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); redo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === "d" && activeElement) {
-        e.preventDefault();
-        duplicateElement();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "a" && (e.target as HTMLElement)?.tagName !== "INPUT" && (e.target as HTMLElement)?.tagName !== "TEXTAREA") {
+      const mod = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+      const key = e.key;
+
+      const matches = (action: string) => {
+        const s = shortcuts[action];
+        if (!s) return false;
+        const parts = s.split("+");
+        const hasCtrl = parts.includes("Ctrl");
+        const hasShift = parts.includes("Shift");
+        const hasAlt = parts.includes("Alt");
+        const lastKey = parts[parts.length - 1];
+        if (mod !== hasCtrl) return false;
+        if (shift !== hasShift) return false;
+        if ((e.altKey) !== hasAlt) return false;
+        const keyMatch = key.toLowerCase() === lastKey.toLowerCase() ||
+          (key === " " && lastKey === "Space") ||
+          (key === "Delete" && lastKey === "Delete") ||
+          (key === "Backspace" && lastKey === "Delete") ||
+          (key === "?" && lastKey === "?") ||
+          (key === "=" && lastKey === "=") ||
+          (key === "-" && lastKey === "-") ||
+          (key === "0" && lastKey === "0");
+        return keyMatch;
+      };
+
+      if (matches("commandPalette")) { e.preventDefault(); setShowCommandPalette(c => !c); return; }
+      if (matches("undo")) { e.preventDefault(); undo(); return; }
+      if (matches("redo")) { e.preventDefault(); redo(); return; }
+      if (matches("duplicate") && activeElement) { e.preventDefault(); duplicateElement(); return; }
+      if (matches("selectAll") && (e.target as HTMLElement)?.tagName !== "INPUT" && (e.target as HTMLElement)?.tagName !== "TEXTAREA") {
         e.preventDefault();
         const all = currentSlide.elements.map(el => el.id);
         setSelectedElements(all);
+        return;
       }
-      if (e.key === "Delete" || e.key === "Backspace") {
+      if (matches("save")) { e.preventDefault(); autoSave(); return; }
+      if (matches("showHelp")) { e.preventDefault(); setShowHelp(h => !h); return; }
+      if (matches("present")) { e.preventDefault(); window.open(`/present/${presentationId}`, "_blank"); return; }
+      if (key === "Delete" || key === "Backspace") {
         if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.contentEditable === "true")) {
           if (selectedElements.length > 0) {
             selectedElements.forEach(id => { if (id) deleteElement(id); });
@@ -318,15 +458,14 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           }
         }
       }
-      if (e.key === "ArrowUp" && activeElement) { e.preventDefault(); nudgeElement(0, -5); }
-      if (e.key === "ArrowDown" && activeElement) { e.preventDefault(); nudgeElement(0, 5); }
-      if (e.key === "ArrowLeft" && activeElement) { e.preventDefault(); nudgeElement(-5, 0); }
-      if (e.key === "ArrowRight" && activeElement) { e.preventDefault(); nudgeElement(5, 0); }
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); setShowHelp(h => !h); }
+      if (key === "ArrowUp" && activeElement) { e.preventDefault(); nudgeElement(0, -5); }
+      if (key === "ArrowDown" && activeElement) { e.preventDefault(); nudgeElement(0, 5); }
+      if (key === "ArrowLeft" && activeElement) { e.preventDefault(); nudgeElement(-5, 0); }
+      if (key === "ArrowRight" && activeElement) { e.preventDefault(); nudgeElement(5, 0); }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeElement, slides, activeSlide, undo, redo, currentSlide.elements]);
+  }, [activeElement, slides, activeSlide, undo, redo, currentSlide.elements, autoSave, presentationId]);
 
   const nudgeElement = (dx: number, dy: number) => {
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
@@ -408,21 +547,8 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     init();
   }, [id, supabase, router]);
 
-  const autoSave = useCallback(async () => {
-    if (presentationId === "new") return;
-    setSaving(true);
-    await supabase.from("presentations").update({ title, slides, updated_at: new Date().toISOString() }).eq("id", presentationId);
-    setSaving(false);
-    setLastSaved(new Date());
-  }, [presentationId, title, slides, supabase]);
-
   useEffect(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(autoSave, 2000);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [slides, title, autoSave]);
-
-  useEffect(() => {
+    preloadKaTeX();
     if (!animStyleRef.current) {
       const style = document.createElement("style");
       style.textContent = getAllAnimationCSS();
@@ -431,9 +557,152 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     }
   }, []);
 
+  // Load custom themes
+  useEffect(() => {
+    setCustomThemes(loadCustomThemes());
+  }, []);
+
+  // Register default plugins on mount
+  useEffect(() => {
+    defaultPlugins.forEach((p) => pluginRegistry.register(p));
+    pluginRegistry.executeInit();
+    return () => {
+      defaultPlugins.forEach((p) => pluginRegistry.unregister(p.id));
+    };
+  }, []);
+
+  // Execute plugin hooks
+  useEffect(() => {
+    pluginRegistry.executeSlideChange(activeSlide);
+  }, [activeSlide]);
+
+  useEffect(() => {
+    pluginRegistry.executeElementSelect(activeEl || null);
+  }, [activeElement]);
+
+  const wordCount = usePluginWordCount(slides);
+  const slideTimes = usePluginSlideTimes();
+
   const exportHTML = () => {
     const html = presentationToHTML(slides, title);
     downloadHTML(html, `${title.replace(/[^a-z0-9]/gi, "_")}.html`);
+  };
+
+  const importPPTX = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pptx";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const imported = await parsePPTXFile(file);
+        const converted = imported.map((s: any) => ({
+          ...s,
+          elements: s.elements.map((el: any) => ({ ...el, visible: true, locked: false, rotation: 0, opacity: 1 })),
+        }));
+        if (converted.length > 0) {
+          const merged = [...slides, ...converted];
+          updateSlides(merged);
+        }
+      } catch (err: any) {
+        alert("PPTX import failed: " + (err.message || "Unknown error"));
+      }
+    };
+    input.click();
+  };
+
+  const importMarkdownFile = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".md,.markdown";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const imported = parseMarkdown(text);
+        const converted = imported.map((s: any) => ({
+          ...s,
+          elements: s.elements.map((el: any) => ({ ...el, visible: true, locked: false, rotation: 0, opacity: 1 })),
+        }));
+        if (converted.length > 0) {
+          const merged = [...slides, ...converted];
+          updateSlides(merged);
+        }
+      } catch (err: any) {
+        alert("Markdown import failed: " + (err.message || "Unknown error"));
+      }
+    };
+    input.click();
+  };
+
+  const importSVG = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".svg";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const element = await parseSVGFile(file);
+        const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+        updated[activeSlide].elements.push(element as any);
+        updateSlides(updated);
+      } catch (err: any) {
+        alert("SVG import failed: " + (err.message || "Unknown error"));
+      }
+    };
+    input.click();
+  };
+
+  const importGoogleSlides = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".html,.htm";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const imported = importFromGoogleSlides(text);
+        const converted = imported.map((s: any) => ({
+          ...s,
+          elements: s.elements.map((el: any) => ({ ...el, visible: true, locked: false, rotation: 0, opacity: 1 })),
+        }));
+        if (converted.length > 0) {
+          const merged = [...slides, ...converted];
+          updateSlides(merged);
+        }
+      } catch (err: any) {
+        alert("Google Slides import failed: " + (err.message || "Unknown error"));
+      }
+    };
+    input.click();
+  };
+
+  const exportVideo = () => {
+    openVideoPlayer(slides as any, title, { duration: 3, transition: "fade" });
+  };
+
+  const exportVideoDownload = () => {
+    exportAsVideoHTML(slides as any, title, { duration: 3, transition: "fade" });
+  };
+
+  const exportGIF = async () => {
+    try {
+      await exportAsGIF(slides as any, { frameDelay: 1500, quality: 0.8 });
+    } catch (err: any) {
+      alert("GIF export failed: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const exportMarkdownFile = () => {
+    downloadMarkdown(slides as any, title);
+  };
+
+  const copyMarkdown = () => {
+    copyMarkdownToClipboard(slides as any);
   };
 
   const saveVersion = async () => {
@@ -492,15 +761,15 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     updateSlides(updated, to);
   };
 
-  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube" | "line" | "table", content?: string) => {
+  const addElement = (type: "text" | "shape" | "code" | "divider" | "youtube" | "line" | "table" | "video" | "audio" | "gif", content?: string) => {
     const newElement: SlideElement = {
       id: String(Date.now()),
       type,
       x: 100 + Math.random() * 50,
       y: 100 + Math.random() * 50,
-      width: type === "text" ? 300 : type === "code" ? 400 : type === "divider" ? 200 : type === "youtube" ? 400 : type === "line" ? 200 : type === "table" ? 350 : 120,
-      height: type === "text" ? 40 : type === "code" ? 200 : type === "divider" ? 3 : type === "youtube" ? 225 : type === "line" ? 3 : type === "table" ? 200 : 120,
-      content: content || (type === "text" ? "Double-click to edit" : type === "code" ? "// Your code here" : type === "youtube" ? content || "https://youtube.com/watch?v=..." : ""),
+      width: type === "text" ? 300 : type === "code" ? 400 : type === "divider" ? 200 : type === "youtube" ? 400 : type === "line" ? 200 : type === "table" ? 350 : type === "video" ? 400 : type === "audio" ? 300 : type === "gif" ? 300 : 120,
+      height: type === "text" ? 40 : type === "code" ? 200 : type === "divider" ? 3 : type === "youtube" ? 225 : type === "line" ? 3 : type === "table" ? 200 : type === "video" ? 225 : type === "audio" ? 60 : type === "gif" ? 200 : 120,
+      content: content || (type === "text" ? "Double-click to edit" : type === "code" ? "// Your code here" : type === "youtube" ? content || "https://youtube.com/watch?v=..." : type === "video" ? content || "" : type === "audio" ? content || "" : type === "gif" ? content || "" : ""),
       color: type === "shape" ? "#F0EDE8" : type === "divider" ? "#C4653A" : type === "line" ? "#C4653A" : "#1C1917",
       fontSize: 18,
       zIndex: currentSlide.elements.length,
@@ -560,6 +829,196 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     updateSlides(updated);
     setActiveElement(newElement.id);
     setUploading(false);
+  };
+
+  const addVideoElement = () => {
+    if (!videoUrl) return;
+    addElement("video", videoUrl);
+    setShowVideoDialog(false);
+    setVideoUrl("");
+  };
+
+  const addAudioElement = () => {
+    if (!audioUrl) return;
+    addElement("audio", audioUrl);
+    setShowAudioDialog(false);
+    setAudioUrl("");
+  };
+
+  const addGIFElement = () => {
+    if (!gifUrl) return;
+    addElement("gif", gifUrl);
+    setShowGIFDialog(false);
+    setGifUrl("");
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) { alert("Video must be under 50MB"); return; }
+    const validTypes = ["video/mp4", "video/webm", "video/ogg"];
+    if (!validTypes.includes(file.type)) { alert("Only MP4, WebM, Ogg allowed"); return; }
+    setUploading(true);
+    let url = "";
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/video/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("files").upload(path, file);
+      if (!error) {
+        const { data: urlData } = supabase.storage.from("files").getPublicUrl(path);
+        if (urlData?.publicUrl) url = urlData.publicUrl;
+      }
+    }
+    if (!url) {
+      url = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+    const newElement: SlideElement = {
+      id: String(Date.now()), type: "video", x: 100, y: 100,
+      width: 400, height: 225, content: url,
+      autoPlay: false, loop: false, muted: false, controls: true,
+      color: "#FFFFFF", zIndex: currentSlide.elements.length,
+      visible: true, locked: false, rotation: 0, opacity: 1,
+    };
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
+    setUploading(false);
+  };
+
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxSize = 20 * 1024 * 1024;
+    if (file.size > maxSize) { alert("Audio must be under 20MB"); return; }
+    const validTypes = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/aac"];
+    if (!validTypes.includes(file.type)) { alert("Only MP3, WAV, Ogg, AAC allowed"); return; }
+    setUploading(true);
+    let url = "";
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/audio/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("files").upload(path, file);
+      if (!error) {
+        const { data: urlData } = supabase.storage.from("files").getPublicUrl(path);
+        if (urlData?.publicUrl) url = urlData.publicUrl;
+      }
+    }
+    if (!url) {
+      url = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+    const newElement: SlideElement = {
+      id: String(Date.now()), type: "audio", x: 100, y: 100,
+      width: 300, height: 60, content: url,
+      autoPlay: false, loop: false,
+      color: "#FFFFFF", zIndex: currentSlide.elements.length,
+      visible: true, locked: false, rotation: 0, opacity: 1,
+    };
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
+    setUploading(false);
+  };
+
+  const handleSVGUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".svg")) { alert("Only SVG files allowed"); return; }
+    setUploading(true);
+    const text = await file.text();
+    if (!text.includes("<svg") && !text.includes("<SVG")) { alert("Invalid SVG file"); setUploading(false); return; }
+    const newElement: SlideElement = {
+      id: String(Date.now()), type: "image", x: 100, y: 100,
+      width: 200, height: 200, content: "",
+      svgContent: text, maintainAspectRatio: true,
+      color: "#FFFFFF", zIndex: currentSlide.elements.length,
+      visible: true, locked: false, rotation: 0, opacity: 1,
+    };
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
+    setUploading(false);
+  };
+
+  const handleCollageTemplate = (template: string) => {
+    const templates: Record<string, { x: number; y: number; width: number; height: number }[]> = {
+      "2-grid": [
+        { x: 10, y: 10, width: 340, height: 380 },
+        { x: 365, y: 10, width: 340, height: 380 },
+      ],
+      "3-grid": [
+        { x: 10, y: 10, width: 223, height: 380 },
+        { x: 243, y: 10, width: 223, height: 380 },
+        { x: 476, y: 10, width: 223, height: 380 },
+      ],
+      "4-grid": [
+        { x: 10, y: 10, width: 340, height: 180 },
+        { x: 365, y: 10, width: 340, height: 180 },
+        { x: 10, y: 200, width: 340, height: 180 },
+        { x: 365, y: 200, width: 340, height: 180 },
+      ],
+      "3-column": [
+        { x: 10, y: 10, width: 223, height: 180 },
+        { x: 243, y: 10, width: 223, height: 180 },
+        { x: 476, y: 10, width: 223, height: 180 },
+        { x: 10, y: 200, width: 223, height: 180 },
+        { x: 243, y: 200, width: 223, height: 180 },
+        { x: 476, y: 200, width: 223, height: 180 },
+      ],
+      "4-column": [
+        { x: 10, y: 10, width: 165, height: 180 },
+        { x: 185, y: 10, width: 165, height: 180 },
+        { x: 360, y: 10, width: 165, height: 180 },
+        { x: 535, y: 10, width: 165, height: 180 },
+        { x: 10, y: 200, width: 165, height: 180 },
+        { x: 185, y: 200, width: 165, height: 180 },
+        { x: 360, y: 200, width: 165, height: 180 },
+        { x: 535, y: 200, width: 165, height: 180 },
+      ],
+      "2+1": [
+        { x: 10, y: 10, width: 460, height: 380 },
+        { x: 480, y: 10, width: 220, height: 180 },
+        { x: 480, y: 200, width: 220, height: 180 },
+      ],
+      "1+2": [
+        { x: 10, y: 10, width: 220, height: 180 },
+        { x: 10, y: 200, width: 220, height: 180 },
+        { x: 240, y: 10, width: 460, height: 380 },
+      ],
+      "spotlight": [
+        { x: 160, y: 40, width: 400, height: 320 },
+      ],
+    };
+    const layout = templates[template];
+    if (!layout) return;
+    const groupId = `collage-${Date.now()}`;
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    layout.forEach((pos, i) => {
+      const placeholder: SlideElement = {
+        id: String(Date.now() + i), type: "image", x: pos.x, y: pos.y,
+        width: pos.width, height: pos.height, content: "",
+        alt: `Collage image ${i + 1}`,
+        color: "#2A2523", zIndex: currentSlide.elements.length + i,
+        visible: true, locked: false, rotation: 0, opacity: 1,
+        borderRadius: 4, groupId, collageTemplate: template,
+      };
+      updated[activeSlide].elements.push(placeholder);
+    });
+    updateSlides(updated);
+    setShowCollageDialog(false);
   };
 
   const addShapeElement = (shapeId: string) => {
@@ -633,6 +1092,59 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     setActiveElement(newElement.id);
     setShowQRDialog(false);
     setQrUrl("");
+  };
+
+  const handleLatexInsert = (latex: string) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    if (editingLatexId) {
+      const el = updated[activeSlide].elements.find((x: SlideElement) => x.id === editingLatexId);
+      if (el) { el.content = latex; updateSlides(updated); setEditingLatexId(null); return; }
+    }
+    const newElement: SlideElement = {
+      id: String(Date.now()),
+      type: "latex",
+      x: 100 + Math.random() * 50,
+      y: 100 + Math.random() * 50,
+      width: 400,
+      height: 100,
+      content: latex,
+      color: "#1C1917",
+      fontSize: 24,
+      zIndex: currentSlide.elements.length,
+      visible: true,
+      locked: false,
+      rotation: 0,
+      opacity: 1,
+    };
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
+  };
+
+  const handleMermaidInsert = (code: string) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    if (editingMermaidId) {
+      const el = updated[activeSlide].elements.find((x: SlideElement) => x.id === editingMermaidId);
+      if (el) { el.content = code; updateSlides(updated); setEditingMermaidId(null); return; }
+    }
+    const newElement: SlideElement = {
+      id: String(Date.now()),
+      type: "mermaid",
+      x: 100 + Math.random() * 50,
+      y: 100 + Math.random() * 50,
+      width: 400,
+      height: 300,
+      content: code,
+      color: "#1C1917",
+      zIndex: currentSlide.elements.length,
+      visible: true,
+      locked: false,
+      rotation: 0,
+      opacity: 1,
+    };
+    updated[activeSlide].elements.push(newElement);
+    updateSlides(updated);
+    setActiveElement(newElement.id);
   };
 
   const renderShapeSVG = (el: SlideElement) => {
@@ -897,6 +1409,87 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
     if (el) { el.animation = anim || undefined; updateSlides(updated); }
   };
 
+  const addAnimation = (elId: string, anim: AnimationDef) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    const el = updated[activeSlide].elements.find(x => x.id === elId);
+    if (el) {
+      if (!el.animations) el.animations = [];
+      if (el.animation) { el.animations.unshift(el.animation); el.animation = undefined; }
+      el.animations.push(anim);
+      updateSlides(updated);
+    }
+  };
+
+  const removeAnimation = (elId: string, idx: number) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    const el = updated[activeSlide].elements.find(x => x.id === elId);
+    if (el && el.animations) {
+      el.animations.splice(idx, 1);
+      if (el.animations.length === 0) el.animations = undefined;
+      updateSlides(updated);
+    }
+  };
+
+  const updateAnimation = (elId: string, idx: number, anim: Partial<AnimationDef>) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    const el = updated[activeSlide].elements.find(x => x.id === elId);
+    if (el) {
+      const anims = el.animations || (el.animation ? [el.animation] : []);
+      if (anims[idx]) { Object.assign(anims[idx], anim); }
+      if (anims.length === 1 && !el.animations) el.animation = anims[0];
+      else el.animations = anims;
+      updateSlides(updated);
+    }
+  };
+
+  const moveAnimation = (elId: string, fromIdx: number, toIdx: number) => {
+    const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+    const el = updated[activeSlide].elements.find(x => x.id === elId);
+    if (el) {
+      const anims = el.animations || (el.animation ? [el.animation] : []);
+      const [moved] = anims.splice(fromIdx, 1);
+      anims.splice(toIdx, 0, moved);
+      if (anims.length === 1 && !el.animations) el.animation = anims[0];
+      else el.animations = anims;
+      updateSlides(updated);
+    }
+  };
+
+  const getAllElementAnimations = (el: SlideElement): AnimationDef[] => {
+    if (el.animations && el.animations.length > 0) return el.animations;
+    if (el.animation) return [el.animation];
+    return [];
+  };
+
+  const enterPreviewMode = () => {
+    setIsPreviewMode(true);
+    setPreviewPlaying(true);
+  };
+
+  const exitPreviewMode = () => {
+    setIsPreviewMode(false);
+    setPreviewPlaying(false);
+    if (previewStyleRef.current) {
+      previewStyleRef.current.remove();
+      previewStyleRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!isPreviewMode || !previewPlaying) return;
+    const elements = currentSlide.elements.filter(el => el.visible);
+    const seq = sequencifyAnimations(elements);
+    const css = getTimelineCSS(seq);
+    if (previewStyleRef.current) previewStyleRef.current.remove();
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.appendChild(style);
+    previewStyleRef.current = style;
+    const totalDur = getTotalDuration(seq);
+    const timer = setTimeout(() => setPreviewPlaying(false), totalDur + 500);
+    return () => { clearTimeout(timer); if (previewStyleRef.current) { previewStyleRef.current.remove(); previewStyleRef.current = null; } };
+  }, [isPreviewMode, previewPlaying, currentSlide]);
+
   const toggleVisibility = (elId: string) => {
     const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
     const el = updated[activeSlide].elements.find(x => x.id === elId);
@@ -989,17 +1582,39 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           {!saving && lastSaved && <span className="text-[11px] text-white/30">Saved</span>}
           <button onClick={autoSave} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Save className="w-4 h-4" /></button>
 
+          {/* Import dropdown */}
+          <div className="relative">
+            <button onClick={() => setShowImportMenu(!showImportMenu)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Import">
+              <FileUp className="w-4 h-4" />
+            </button>
+            {showImportMenu && (
+              <div className="absolute top-full right-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-1 shadow-xl z-50 w-56">
+                <button onClick={() => { setShowImportMenu(false); importPPTX(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileDown className="w-3.5 h-3.5" /> Import PowerPoint (.pptx)</button>
+                <button onClick={() => { setShowImportMenu(false); importMarkdownFile(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileText className="w-3.5 h-3.5" /> Import Markdown (.md)</button>
+                <button onClick={() => { setShowImportMenu(false); importSVG(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileImage className="w-3.5 h-3.5" /> Import SVG</button>
+                <button onClick={() => { setShowImportMenu(false); importGoogleSlides(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileText className="w-3.5 h-3.5" /> Import Google Slides (HTML)</button>
+              </div>
+            )}
+          </div>
+
           {/* Export dropdown */}
           <div className="relative">
             <button onClick={() => setShowExportMenu(!showExportMenu)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Export">
               <Download className="w-4 h-4" />
             </button>
             {showExportMenu && (
-              <div className="absolute top-full right-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-1 shadow-xl z-50 w-40">
-                <button onClick={() => { exportToPDF(title, slides); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all">Export as PDF</button>
-                <button onClick={() => { exportToPPTX(title, slides); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all">Export as PPTX</button>
-                <button onClick={() => { exportHTML(); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all">Export as HTML</button>
-                <button onClick={() => { exportSlideAsPNG(canvasRef.current, title, activeSlide); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all">Export Slide PNG</button>
+              <div className="absolute top-full right-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-1 shadow-xl z-50 w-44">
+                <button onClick={() => { exportToPDF(title, slides); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileDown className="w-3.5 h-3.5" /> Export as PDF</button>
+                <button onClick={() => { exportToPPTX(title, slides); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileDown className="w-3.5 h-3.5" /> Export as PPTX</button>
+                <button onClick={() => { exportHTML(); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileText className="w-3.5 h-3.5" /> Export as HTML</button>
+                <button onClick={() => { exportSlideAsPNG(canvasRef.current, title, activeSlide); setShowExportMenu(false); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileImage className="w-3.5 h-3.5" /> Export Slide PNG</button>
+                <div className="w-full h-px bg-white/5 my-1" />
+                <button onClick={() => { setShowExportMenu(false); exportVideo(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileVideo className="w-3.5 h-3.5" /> Export as Video</button>
+                <button onClick={() => { setShowExportMenu(false); exportVideoDownload(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileVideo className="w-3.5 h-3.5" /> Download Video HTML</button>
+                <button onClick={() => { setShowExportMenu(false); exportGIF(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileImage className="w-3.5 h-3.5" /> Export as GIF</button>
+                <div className="w-full h-px bg-white/5 my-1" />
+                <button onClick={() => { setShowExportMenu(false); exportMarkdownFile(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileText className="w-3.5 h-3.5" /> Export as Markdown</button>
+                <button onClick={() => { setShowExportMenu(false); copyMarkdown(); }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/5 rounded transition-all"><FileText className="w-3.5 h-3.5" /> Copy Markdown</button>
               </div>
             )}
           </div>
@@ -1010,6 +1625,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           <button onClick={togglePublic} className={`p-2 rounded-lg transition-all ${isPublic ? "text-sienna bg-sienna/10" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}>
             <Globe className="w-4 h-4" />
           </button>
+          <button onClick={async () => { setShowCustomShow(true); const shows = await loadCustomShows(presentationId); setCustomShows(shows); setSelectedCustomIndices(new Set()); setCustomShowName(""); }} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5" title="Custom Slide Show"><Presentation className="w-4 h-4" /></button>
           <button onClick={() => setShowSettings(true)} className="p-2 text-white/40 hover:text-white/70 transition-colors rounded-lg hover:bg-white/5"><Settings className="w-4 h-4" /></button>
           <div className="w-px h-5 bg-white/10 mx-1" />
           <Link href={`/present/${presentationId}`}
@@ -1178,6 +1794,43 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button onClick={() => { const url = prompt("Enter YouTube video URL:"); if (url) { addElement("youtube", url); } }} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="YouTube">
               <Play className="w-4 h-4" />
             </button>
+            <button onClick={() => setShowVideoDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Video">
+              <Video className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowAudioDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Audio">
+              <Music className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowGIFDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="GIF">
+              <Film className="w-4 h-4" />
+            </button>
+            <div className="relative">
+              <button onClick={() => setShowUploadMenu(!showUploadMenu)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Upload">
+                <Upload className="w-4 h-4" />
+              </button>
+              {showUploadMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-1 shadow-xl z-50 w-36">
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60 hover:bg-white/5 rounded cursor-pointer transition-all">
+                    <Image className="w-3.5 h-3.5" /> Upload Image
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  </label>
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60 hover:bg-white/5 rounded cursor-pointer transition-all">
+                    <Video className="w-3.5 h-3.5" /> Upload Video
+                    <input type="file" accept="video/mp4,video/webm,video/ogg" className="hidden" onChange={handleVideoUpload} />
+                  </label>
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60 hover:bg-white/5 rounded cursor-pointer transition-all">
+                    <Music className="w-3.5 h-3.5" /> Upload Audio
+                    <input type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
+                  </label>
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-xs text-white/60 hover:bg-white/5 rounded cursor-pointer transition-all">
+                    <Code className="w-3.5 h-3.5" /> Upload SVG
+                    <input type="file" accept=".svg" className="hidden" onChange={handleSVGUpload} />
+                  </label>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setShowCollageDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Photo Collage">
+              <LayoutTemplate className="w-4 h-4" />
+            </button>
             <button onClick={() => setShowQRDialog(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="QR Code">
               <QrCode className="w-4 h-4" />
             </button>
@@ -1189,6 +1842,12 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             </button>
             <button onClick={() => addElement("table")} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Table">
               <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowLatexEditor(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="LaTeX Equation">
+              <Sigma className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowMermaidEditor(true)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Mermaid Diagram">
+              <Workflow className="w-4 h-4" />
             </button>
             <div className="w-px h-4 bg-white/10 mx-1" />
             <div className="relative">
@@ -1239,23 +1898,49 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     <button onClick={() => handleDistribute("horizontal")} className="flex items-center gap-1 px-2 py-1 text-[10px] text-white/50 hover:bg-white/10 rounded transition-all"><AlignJustify className="w-3 h-3" /> H</button>
                     <button onClick={() => handleDistribute("vertical")} className="flex items-center gap-1 px-2 py-1 text-[10px] text-white/50 hover:bg-white/10 rounded transition-all"><LayoutGrid className="w-3 h-3" /> V</button>
                   </div>
+                  <div className="pt-1 border-t border-white/10 mt-1">
+                    <button onClick={() => {
+                      const targets = selectedElements.length > 0 ? selectedElements : currentSlide.elements.map(e => e.id);
+                      const els = currentSlide.elements.filter(e => targets.includes(e.id));
+                      const arranged = autoArrangeElements(els, 720, 405);
+                      const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+                      arranged.forEach((a) => {
+                        const el = u[activeSlide].elements.find((e: SlideElement) => e.id === a.id);
+                        if (el) { el.x = a.x; el.y = a.y; el.width = a.width; el.height = a.height; }
+                      });
+                      updateSlides(u);
+                      setShowAlignTools(false);
+                    }} className="flex items-center gap-1 w-full px-2 py-1.5 text-[10px] text-white/50 hover:bg-white/10 rounded transition-all">
+                      <Layout className="w-3 h-3" /> Smart Layout
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+            <button onClick={() => setShowAIGenerate(true)} className="p-1.5 text-white/40 hover:text-sienna hover:bg-sienna/10 rounded-lg transition-all shrink-0" title="AI Generate Slides">
+              <Wand2 className="w-4 h-4" />
+            </button>
             <div className="relative">
-              <button onClick={() => setShowThemeMenu(!showThemeMenu)} className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/5 rounded-lg transition-all shrink-0" title="Themes">
+              <button onClick={() => setShowThemeMenu(!showThemeMenu)} className={`p-1.5 rounded-lg transition-all shrink-0 ${showThemeMenu ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Themes">
                 <Sparkles className="w-4 h-4" />
               </button>
               {showThemeMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-2 shadow-xl z-50 w-48 max-h-72 overflow-y-auto">
-                  <div className="grid grid-cols-2 gap-1">
-                    {themePresets.map((t) => (
+                <div className="absolute top-full left-0 mt-1 bg-[#2A2523] border border-white/10 rounded-lg p-2 shadow-xl z-50 w-56 max-h-80 overflow-y-auto">
+                  <div className="text-[10px] text-white/30 uppercase tracking-wider px-1 mb-1.5">Preset Themes</div>
+                  <div className="grid grid-cols-2 gap-1 mb-2">
+                    {[...themePresets, ...customThemes.map(t => ({ name: t.name, bg: t.background, accent: t.accentColor, font: t.fontFamily }))].map((t) => (
                       <button key={t.name} onClick={() => { const u = applyTheme(t, slides); updateSlides(u); setShowThemeMenu(false); }}
                         className="flex flex-col items-center gap-1 p-2 rounded hover:bg-white/10 transition-all">
                         <div className="w-full h-6 rounded border border-white/10" style={{ background: t.bg, borderBottom: `3px solid ${t.accent}` }} />
-                        <span className="text-[9px] text-white/50">{t.name}</span>
+                        <span className="text-[9px] text-white/50 truncate w-full text-center">{t.name}</span>
                       </button>
                     ))}
+                  </div>
+                  <div className="border-t border-white/10 pt-1.5">
+                    <button onClick={() => { setShowThemeMenu(false); setShowCustomThemeEditor(true); }}
+                      className="flex items-center gap-1.5 w-full px-2 py-1.5 text-[10px] text-sienna hover:bg-sienna/10 rounded transition-all">
+                      <Palette className="w-3 h-3" /> Custom Theme
+                    </button>
                   </div>
                 </div>
               )}
@@ -1263,12 +1948,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             <button onClick={() => setShowAnimations(!showAnimations)} className={`p-1.5 rounded-lg transition-all shrink-0 ${showAnimations ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Animations">
               <Play className="w-4 h-4" />
             </button>
+            <button onClick={enterPreviewMode} disabled={isPreviewMode} className="p-1.5 text-white/40 hover:text-sienna hover:bg-sienna/10 rounded-lg transition-all shrink-0 disabled:opacity-30" title="Preview Animation">
+              <List className="w-4 h-4" />
+            </button>
             <div className="w-px h-4 bg-white/10 mx-1" />
             <button onClick={() => setShowGrid(!showGrid)} className={`p-1.5 rounded-lg transition-all shrink-0 ${showGrid ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Grid">
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button onClick={() => setSnapEnabled(!snapEnabled)} className={`p-1.5 rounded-lg transition-all shrink-0 ${snapEnabled ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Snap">
               <LayoutGrid className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-white/10 mx-1" />
+            <button onClick={() => { setShowSpellCheck(!showSpellCheck); setShowAccessibility(false); }} className={`p-1.5 rounded-lg transition-all shrink-0 relative ${showSpellCheck ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Spell Check">
+              <CheckCheck className="w-4 h-4" />
+              {(() => { try { const el = currentSlide?.elements; if (!el) return null; const content = el.filter(e => e.type === "text" && e.content).map(e => e.content).join(" "); const issues = checkSpelling(content); const grammar = checkGrammar(content); const total = issues.length + grammar.length; if (total === 0) return null; return <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-sienna text-white text-[7px] font-bold rounded-full flex items-center justify-center">{total > 9 ? "9+" : total}</span>; } catch { return null; }})()}
+            </button>
+            <button onClick={() => { setShowAccessibility(!showAccessibility); setShowSpellCheck(false); }} className={`p-1.5 rounded-lg transition-all shrink-0 relative ${showAccessibility ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`} title="Accessibility Check">
+              <Eye className="w-4 h-4" />
+              {(() => { try { const el = currentSlide; if (!el || !el.elements) return null; const issues = checkAccessibility(el as any, () => {}); if (issues.length === 0) return null; return <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-sienna text-white text-[7px] font-bold rounded-full flex items-center justify-center">{issues.length > 9 ? "9+" : issues.length}</span>; } catch { return null; }})()}
             </button>
             <button onClick={() => setZoom(100)} className="p-1 text-[10px] text-white/30 hover:text-white/60 rounded transition-all shrink-0" title="Reset Zoom">100%</button>
             <button onClick={() => setZoom(Math.max(25, Math.min(200, Math.floor(window.innerHeight / 405 * 100))))} className="p-1 text-white/40 hover:text-white/70 rounded transition-all shrink-0" title="Fit to Canvas"><Expand className="w-3 h-3" /></button>
@@ -1279,7 +1976,16 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
             </div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center bg-[#1A1715] p-8 overflow-auto" onContextMenu={handleCanvasContextMenu}>
+          <div className="flex-1 flex items-center justify-center bg-[#1A1715] p-8 overflow-auto relative" onContextMenu={handleCanvasContextMenu}>
+            {isPreviewMode && (
+              <div className="absolute top-0 left-0 right-0 z-50 bg-sienna/90 text-white text-[11px] font-medium px-4 py-1.5 flex items-center justify-between">
+                <span>Preview Mode — Animations playing in sequence</span>
+                <div className="flex items-center gap-2">
+                  {!previewPlaying && <span className="text-white/70">Playback complete</span>}
+                  <button onClick={exitPreviewMode} className="text-[10px] bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded transition-all">Exit Preview</button>
+                </div>
+              </div>
+            )}
             <div className="flex flex-col">
               {/* Top ruler */}
               <div className="flex" style={{ marginLeft: "20px" }}>
@@ -1352,17 +2058,17 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   style={guide.type === "vertical" ? { left: guide.position * zoom / 100, top: 0 } : { top: guide.position * zoom / 100, left: 0 }} />
               ))}
               {currentSlide.elements.filter(el => el.visible).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((el) => (
-                <div key={el.id} data-element="true"
-                  onMouseDown={(e) => handleElementMouseDown(e, el)}
-                  onContextMenu={(e) => handleElementContextMenu(e, el)}
-                  className={`absolute select-none ${activeElement === el.id ? "ring-2 ring-sienna" : "hover:ring-1 hover:ring-white/20"} ${el.locked ? "cursor-not-allowed" : !dragState ? "cursor-move" : ""} ${el.animation ? "animate__animated" : ""}`}
+                <div key={el.id} data-element="true" data-seq-id={el.id}
+                  onMouseDown={(e) => { if (!isPreviewMode) handleElementMouseDown(e, el); }}
+                  onContextMenu={(e) => { if (!isPreviewMode) handleElementContextMenu(e, el); }}
+                  className={`absolute select-none ${isPreviewMode ? "pointer-events-none" : ""} ${activeElement === el.id && !isPreviewMode ? "ring-2 ring-sienna" : "hover:ring-1 hover:ring-white/20"} ${el.locked ? "cursor-not-allowed" : !dragState ? "cursor-move" : ""}`}
                   style={{
                     left: el.x * zoom / 100, top: el.y * zoom / 100,
                     width: el.width * zoom / 100, height: el.height * zoom / 100,
                     zIndex: el.zIndex || 0, opacity: el.opacity,
                     transform: `rotate(${el.rotation || 0}deg)${el.flipH ? " scaleX(-1)" : ""}${el.flipV ? " scaleY(-1)" : ""}`,
                     boxShadow: el.shadow || undefined,
-                    animation: el.animation ? `${el.animation.type} ${el.animation.duration || 500}ms ${el.animation.delay || 0}ms both` : undefined,
+                    animation: !isPreviewMode && el.animation ? `${el.animation.type} ${el.animation.duration || 500}ms ${el.animation.delay || 0}ms both` : undefined,
                   }}>
                   {el.type === "text" ? (
                     <div contentEditable suppressContentEditableWarning className="w-full h-full outline-none break-words"
@@ -1384,6 +2090,9 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                     </div>
                   ) : el.type === "divider" ? (
                     <div className="w-full h-full" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0 }} />
+                  ) : el.svgContent ? (
+                    <div className="w-full h-full flex items-center justify-center p-2 overflow-hidden"
+                      dangerouslySetInnerHTML={{ __html: el.colorOverride ? el.svgContent.replace(/fill="[^"]*"/g, `fill="${el.colorOverride}"`).replace(/stroke="[^"]*"/g, `stroke="${el.colorOverride}"`) : el.svgContent }} />
                   ) : el.type === "image" ? (
                     <div className="w-full h-full overflow-hidden relative" style={{
                       borderRadius: el.borderRadius || 0,
@@ -1397,6 +2106,26 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                         <img src={el.content} alt={el.alt || ""} className="w-full h-full object-cover" draggable={false} />
                       )}
                     </div>
+                  ) : el.type === "video" ? (
+                    <video src={el.content} autoPlay={el.autoPlay} loop={el.loop} muted={el.muted} controls={el.controls !== false}
+                      className="w-full h-full object-cover rounded" />
+                  ) : el.type === "audio" ? (
+                    <div className="w-full h-full flex items-center gap-2 px-3 bg-[#1E1E1E] rounded-lg border border-white/10">
+                      <button className="text-white/60 hover:text-white shrink-0" onClick={() => {
+                        const aud = document.getElementById(`audio-${el.id}`) as HTMLAudioElement;
+                        if (aud) { if (aud.paused) aud.play(); else aud.pause(); }
+                      }}>
+                        <Play className="w-4 h-4" />
+                      </button>
+                      <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-sienna rounded-full transition-all" style={{ width: "0%" }} />
+                      </div>
+                      <span className="text-[10px] text-white/30 truncate max-w-[120px]">{el.content.split("/").pop()?.split("?")[0] || "audio"}</span>
+                      <audio id={`audio-${el.id}`} src={el.content} autoPlay={el.autoPlay} loop={el.loop} />
+                    </div>
+                  ) : el.type === "gif" ? (
+                    <img src={el.content} alt={el.alt || "GIF"} className="w-full h-full object-cover rounded" draggable={false}
+                      style={el.speed ? { animationDuration: `${el.speed}s` } : undefined} />
                   ) : el.type === "youtube" ? (
                     <iframe src={parseYouTubeUrl(el.content)} className="w-full h-full" allowFullScreen />
                   ) : el.type === "line" ? (
@@ -1444,6 +2173,11 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                         </div>
                       )}
                     </div>
+                  ) : el.type === "latex" ? (
+                    <div className="w-full h-full flex items-center justify-center overflow-x-auto" style={{ fontSize: el.fontSize || 24 }}
+                      dangerouslySetInnerHTML={{ __html: (() => { try { return renderLatexToSVG(el.content); } catch { return `<div style="font-family:monospace;color:#4ade80;background:#1a1a1a;padding:8px;border-radius:4px;white-space:pre-wrap">${el.content.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`; } })() }} />
+                  ) : el.type === "mermaid" ? (
+                    <MermaidPreview code={el.content} />
                   ) : (
                     <div className="w-full h-full rounded" style={{ background: el.color || el.gradient, borderRadius: el.borderRadius || 0, border: el.strokeWidth ? `${el.strokeWidth}px ${el.strokeDash || "solid"} ${el.strokeColor || el.color}` : undefined }} />
                   )}
@@ -1524,41 +2258,130 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
 
           {/* Animation panel (overlay/tray) */}
           {showAnimations && activeEl && (
-            <div className="h-36 bg-[#231F1D] border-t border-white/5 flex flex-col shrink-0">
-              <div className="px-4 py-1.5 border-b border-white/5 flex items-center justify-between">
+            <div className="bg-[#231F1D] border-t border-white/5 flex flex-col shrink-0" style={{ maxHeight: "240px" }}>
+              <div className="px-4 py-1.5 border-b border-white/5 flex items-center justify-between shrink-0">
                 <span className="text-xs font-medium text-white/40">Animation</span>
-                <button onClick={() => { if (activeEl) setAnimation(activeEl.id, null); }} className="text-[10px] text-white/30 hover:text-red-400 transition-colors">Remove</button>
-              </div>
-              <div className="flex-1 flex flex-col justify-center gap-2 px-4">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {animationNames.map((a) => (
-                    <button key={a.value} onClick={() => setAnimation(activeEl.id, { type: a.value, duration: activeEl.animation?.duration || 500, delay: activeEl.animation?.delay || 0, easing: "ease-out" })}
-                      className={`text-[11px] px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${
-                        activeEl.animation?.type === a.value ? "bg-sienna text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70"
-                      }`}>
-                      {a.label}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowMotionPath(!showMotionPath)}
+                    className={`text-[10px] px-2 py-0.5 rounded transition-all ${showMotionPath ? "bg-sienna text-white" : "text-white/30 hover:text-white/60"}`}>
+                    Motion Path
+                  </button>
+                  <button onClick={() => { if (activeEl) setAnimation(activeEl.id, null); }}
+                    className="text-[10px] text-white/30 hover:text-red-400 transition-colors">Remove</button>
                 </div>
-                {activeEl.animation && (
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-[10px] text-white/30 w-12">Duration</span>
-                      <input type="range" min="100" max="3000" step="100" value={activeEl.animation.duration}
-                        onChange={(e) => { const v = parseInt(e.target.value); setAnimation(activeEl.id, { ...activeEl.animation!, duration: v }); }}
-                        className="flex-1 accent-sienna h-1" />
-                      <span className="text-[10px] text-white/30 w-10">{activeEl.animation.duration}ms</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-[10px] text-white/30 w-8">Delay</span>
-                      <input type="range" min="0" max="3000" step="100" value={activeEl.animation.delay}
-                        onChange={(e) => { const v = parseInt(e.target.value); setAnimation(activeEl.id, { ...activeEl.animation!, delay: v }); }}
-                        className="flex-1 accent-sienna h-1" />
-                      <span className="text-[10px] text-white/30 w-10">{activeEl.animation.delay}ms</span>
-                    </div>
-                  </div>
-                )}
               </div>
+              {showMotionPath ? (
+                <div className="flex-1 overflow-y-auto">
+                  <MotionPathEditor onApply={(path, duration) => {
+                    addAnimation(activeEl.id, { type: "motion-path", duration, delay: 0, easing: "ease-out", motionPath: path });
+                    setShowMotionPath(false);
+                  }} />
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+                  {/* Animation type selector */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-wrap">
+                    {animationNames.map((a) => {
+                      const anims = getAllElementAnimations(activeEl);
+                      const isActive = anims.length > 0 && anims[anims.length - 1]?.type === a.value;
+                      return (
+                        <button key={a.value} onClick={() => addAnimation(activeEl.id, { type: a.value, duration: 500, delay: 0, easing: "ease-out" })}
+                          className={`text-[10px] px-2.5 py-1 rounded-lg whitespace-nowrap transition-all ${
+                            isActive ? "bg-sienna text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70"
+                          }`}>
+                          {a.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Multi-animation list */}
+                  {(() => {
+                    const anims = getAllElementAnimations(activeEl);
+                    if (anims.length === 0) return (
+                      <div className="text-[10px] text-white/20 text-center py-4">Select an animation type above to add</div>
+                    );
+                    return (
+                      <div className="space-y-1">
+                        {anims.map((anim, idx) => (
+                          <div key={idx} className="bg-[#1A1715] rounded-lg p-2 space-y-1.5">
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                <GripVertical className="w-3 h-3 text-white/20 shrink-0 cursor-grab" />
+                                <span className="text-[10px] font-medium text-white/60 truncate">{animationNames.find(n => n.value === anim.type)?.label || anim.type}</span>
+                              </div>
+                              <button onClick={() => removeAnimation(activeEl.id, idx)}
+                                className="text-white/20 hover:text-red-400 transition-colors shrink-0">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                              {/* Duration */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] text-white/20 w-10">Duration</span>
+                                <input type="range" min="100" max="5000" step="100" value={anim.duration}
+                                  onChange={(e) => updateAnimation(activeEl.id, idx, { duration: parseInt(e.target.value) })}
+                                  className="flex-1 accent-sienna h-0.5" />
+                                <span className="text-[8px] text-white/20 w-8 text-right">{anim.duration}ms</span>
+                              </div>
+                              {/* Delay */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] text-white/20 w-10">Delay</span>
+                                <input type="range" min="0" max="5000" step="100" value={anim.delay}
+                                  onChange={(e) => updateAnimation(activeEl.id, idx, { delay: parseInt(e.target.value) })}
+                                  className="flex-1 accent-sienna h-0.5" />
+                                <span className="text-[8px] text-white/20 w-8 text-right">{anim.delay}ms</span>
+                              </div>
+                            </div>
+                            {/* Timing controls */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {/* Easing */}
+                              <select value={anim.easing} onChange={(e) => updateAnimation(activeEl.id, idx, { easing: e.target.value })}
+                                className="bg-[#2A2523] text-white/60 text-[9px] px-1.5 py-0.5 rounded border border-white/5 outline-none">
+                                {easingOptions.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                              {/* Direction */}
+                              <select value={anim.direction || "normal"} onChange={(e) => updateAnimation(activeEl.id, idx, { direction: e.target.value as any })}
+                                className="bg-[#2A2523] text-white/60 text-[9px] px-1.5 py-0.5 rounded border border-white/5 outline-none">
+                                {directionOptions.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                              {/* Fill mode */}
+                              <select value={anim.fillMode || "both"} onChange={(e) => updateAnimation(activeEl.id, idx, { fillMode: e.target.value as any })}
+                                className="bg-[#2A2523] text-white/60 text-[9px] px-1.5 py-0.5 rounded border border-white/5 outline-none">
+                                {fillModeOptions.map((o) => (
+                                  <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                              </select>
+                              {/* Iteration count */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-[8px] text-white/20">Loop</span>
+                                <input type="number" min="1" max="10" value={anim.iterationCount === "infinite" ? 1 : (anim.iterationCount || 1)}
+                                  onChange={(e) => updateAnimation(activeEl.id, idx, { iterationCount: parseInt(e.target.value) || 1 })}
+                                  className="w-6 bg-[#2A2523] text-white/60 text-[9px] px-1 py-0.5 rounded border border-white/5 outline-none text-center" />
+                                <button onClick={() => updateAnimation(activeEl.id, idx, { iterationCount: anim.iterationCount === "infinite" ? 1 : "infinite" })}
+                                  className={`text-[8px] px-1 py-0.5 rounded ${anim.iterationCount === "infinite" ? "text-sienna bg-sienna/10" : "text-white/20"} transition-all`}>
+                                  ∞
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {/* Add animation button */}
+                        <button onClick={() => {
+                          const lastType = anims[anims.length - 1]?.type || "fade-in";
+                          addAnimation(activeEl.id, { type: lastType, duration: 500, delay: 0, easing: "ease-out" });
+                        }} className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors w-full justify-center py-1">
+                          <Plus className="w-3 h-3" /> Add Animation
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
@@ -1576,19 +2399,47 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           )}
 
           <div className="h-8 bg-[#231F1D] border-t border-white/5 flex items-center justify-between px-4 shrink-0">
-            <span className="text-[11px] text-white/25">Slide {activeSlide + 1} of {slides.length}</span>
             <div className="flex items-center gap-3 text-[11px] text-white/25">
-              <span>Ctrl+Z Undo</span>
-              <span>Del Delete</span>
-              <span>Arrows Nudge</span>
+              <span>Slide {activeSlide + 1} of {slides.length}</span>
+              {wordCount > 0 && <span className="text-white/20">{wordCount} words</span>}
+            </div>
+            <div className="flex items-center gap-3 text-[11px] text-white/25">
               <span>720 x 405</span>
+              <button onClick={() => setShowPluginManager(true)} className="text-white/30 hover:text-white/60 transition-colors" title="Plugins"><Puzzle className="w-3 h-3 inline" /> Plugins</button>
               <button onClick={() => setShowHelp(!showHelp)} className="text-white/30 hover:text-white/60 transition-colors" title="Keyboard Shortcuts">? Help</button>
             </div>
           </div>
         </div>
 
-        {/* Properties panel */}
+        {/* Properties panel - right side */}
         <div className="w-64 bg-[#231F1D] border-l border-white/5 flex flex-col shrink-0 overflow-y-auto">
+          {showSpellCheck ? (
+            <SpellCheckPanel
+              elements={currentSlide.elements.map(el => ({ id: el.id, type: el.type, content: el.content }))}
+              onFix={(elId, original, replacement) => {
+                const updated = JSON.parse(JSON.stringify(slides)) as Slide[];
+                const el = updated[activeSlide].elements.find((x: SlideElement) => x.id === elId);
+                if (!el) return;
+                el.content = el.content.replace(original, replacement);
+                updateSlides(updated);
+              }}
+              onIgnore={() => {}}
+            />
+          ) : showAccessibility ? (
+            <AccessibilityPanel
+              issues={a11yIssues}
+              onFix={(issue) => {
+                if (issue.fix) issue.fix();
+                setA11yIssues(prev => prev.filter(i => i !== issue));
+              }}
+              onFixAll={() => {
+                for (const issue of a11yIssues) {
+                  if (issue.fix) issue.fix();
+                }
+                setA11yIssues([]);
+              }}
+            />
+          ) : (<>
           <div className="p-3 border-b border-white/5 flex items-center justify-between">
             <span className="text-xs font-medium text-white/40">{activeElement ? "Properties" : "Slide"}</span>
             <button onClick={() => setShowNotes(!showNotes)} className={`p-1 rounded ${showNotes ? "text-sienna" : "text-white/30 hover:text-white/60"}`}><StickyNote className="w-3.5 h-3.5" /></button>
@@ -1640,7 +2491,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               </div>
 
               {/* Hyperlink */}
-              {(activeEl.type === "text" || activeEl.type === "image" || activeEl.type === "shape") && (
+              {(activeEl.type === "text" || activeEl.type === "image" || activeEl.type === "shape" || activeEl.type === "video" || activeEl.type === "audio" || activeEl.type === "gif") && (
                 <div>
                   <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Hyperlink</label>
                   <input type="text" value={activeEl.href || ""} placeholder="https://..."
@@ -1843,7 +2694,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               )}
 
               {/* Lock aspect ratio */}
-              {(activeEl.type === "image" || activeEl.type === "shape") && (
+              {(activeEl.type === "image" || activeEl.type === "shape" || activeEl.svgContent) && (
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-white/30 uppercase tracking-wider">Lock Aspect Ratio</span>
                   <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.lockAspectRatio = !el.lockAspectRatio; setSlides(u); } }}
@@ -1878,6 +2729,41 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                       <option key={l} value={l}>{l.charAt(0).toUpperCase() + l.slice(1)}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* LaTeX properties */}
+              {activeEl.type === "latex" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Equation (LaTeX)</label>
+                    <textarea value={activeEl.content} placeholder="\\frac{a}{b}"
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.content = e.target.value; setSlides(u); } }}
+                      className="w-full bg-[#1A1715] border border-white/10 rounded-lg px-3 py-2 text-xs text-green-400 font-mono outline-none resize-none" style={{ minHeight: 60 }} />
+                  </div>
+                  <button onClick={() => { setEditingLatexId(activeElement); setShowLatexEditor(true); }}
+                    className="w-full text-[11px] bg-sienna/20 text-sienna py-1.5 rounded-lg hover:bg-sienna/30 transition-all">Edit in LaTeX Editor</button>
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Font Size</label>
+                    <input type="range" min="12" max="72" value={activeEl.fontSize || 24}
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.fontSize = parseInt(e.target.value); setSlides(u); } }}
+                      className="w-full accent-sienna" />
+                    <span className="text-[10px] text-white/30">{activeEl.fontSize || 24}px</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Mermaid properties */}
+              {activeEl.type === "mermaid" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Diagram Source</label>
+                    <textarea value={activeEl.content} placeholder="graph TD&#10;  A[Start] --> B[End]"
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.content = e.target.value; setSlides(u); } }}
+                      className="w-full bg-[#1A1715] border border-white/10 rounded-lg px-3 py-2 text-xs text-green-400 font-mono outline-none resize-none" style={{ minHeight: 80 }} />
+                  </div>
+                  <button onClick={() => { setEditingMermaidId(activeElement); setShowMermaidEditor(true); }}
+                    className="w-full text-[11px] bg-sienna/20 text-sienna py-1.5 rounded-lg hover:bg-sienna/30 transition-all">Edit in Mermaid Editor</button>
                 </div>
               )}
 
@@ -1989,6 +2875,24 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                 </div>
               )}
 
+              {/* AI Image */}
+              {activeEl.type === "image" && (
+                <div>
+                  <button onClick={() => setShowAIImage(true)}
+                    className="w-full text-[11px] bg-sienna/20 text-sienna py-1.5 rounded-lg hover:bg-sienna/30 transition-all flex items-center justify-center gap-1.5">
+                    <Wand2 className="w-3.5 h-3.5" /> AI Generate Image
+                  </button>
+                </div>
+              )}
+              {activeEl.type === "image" && (
+                <div>
+                  <button onClick={() => setShowBackgroundRemover(true)}
+                    className="w-full text-[11px] bg-white/5 text-white/50 py-1.5 rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-1.5">
+                    <Trash2 className="w-3.5 h-3.5" /> Remove Background
+                  </button>
+                </div>
+              )}
+
               {/* Shape mask for images */}
               {activeEl.type === "image" && (
                 <div>
@@ -2016,6 +2920,104 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
                   <input type="text" value={activeEl.alt || ""}
                     onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.alt = e.target.value; setSlides(u); } }}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                </div>
+              )}
+
+              {/* Video properties */}
+              {activeEl.type === "video" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Video URL</label>
+                    <input type="text" value={activeEl.content || ""} placeholder="https://example.com/video.mp4"
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.content = e.target.value; setSlides(u); } }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Auto Play</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.autoPlay = !el.autoPlay; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.autoPlay ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.autoPlay ? "On" : "Off"}</button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Loop</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.loop = !el.loop; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.loop ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.loop ? "On" : "Off"}</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Muted</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.muted = !el.muted; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.muted ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.muted ? "On" : "Off"}</button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Controls</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.controls = el.controls === false ? true : false; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.controls !== false ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.controls !== false ? "Show" : "Hide"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Audio properties */}
+              {activeEl.type === "audio" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Audio URL</label>
+                    <input type="text" value={activeEl.content || ""} placeholder="https://example.com/audio.mp3"
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.content = e.target.value; setSlides(u); } }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Auto Play</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.autoPlay = !el.autoPlay; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.autoPlay ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.autoPlay ? "On" : "Off"}</button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/30">Loop</span>
+                      <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.loop = !el.loop; setSlides(u); } }}
+                        className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.loop ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.loop ? "On" : "Off"}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* GIF properties */}
+              {activeEl.type === "gif" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">GIF URL</label>
+                    <input type="text" value={activeEl.content || ""} placeholder="https://example.com/animation.gif"
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.content = e.target.value; setSlides(u); } }}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/60 outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Speed</label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="0.5" max="3" step="0.25" value={activeEl.speed || 1}
+                        onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.speed = parseFloat(e.target.value); setSlides(u); } }}
+                        className="flex-1 accent-sienna" />
+                      <span className="text-[10px] text-white/30 w-8">{activeEl.speed || 1}x</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SVG properties */}
+              {activeEl.svgContent && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/30">Maintain Aspect Ratio</span>
+                    <button onClick={() => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.maintainAspectRatio = !el.maintainAspectRatio; setSlides(u); } }}
+                      className={`text-[11px] px-2 py-0.5 rounded transition-all ${activeEl.maintainAspectRatio ? "bg-sienna/20 text-sienna" : "bg-white/5 text-white/40"}`}>{activeEl.maintainAspectRatio ? "On" : "Off"}</button>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Color Override (mono SVGs)</label>
+                    <input type="color" value={activeEl.colorOverride || "#C4653A"}
+                      onChange={(e) => { const u = JSON.parse(JSON.stringify(slides)) as Slide[]; const el = u[activeSlide].elements.find(x => x.id === activeElement); if (el) { el.colorOverride = e.target.value; setSlides(u); } }}
+                      className="w-full h-7 rounded cursor-pointer bg-transparent border border-white/10" />
+                  </div>
                 </div>
               )}
 
@@ -2184,6 +3186,7 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               </div>
             </div>
           )}
+          </>)}
         </div>
       </div>
 
@@ -2205,6 +3208,80 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         />
       )}
 
+      {/* Video Dialog */}
+      {showVideoDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowVideoDialog(false); setVideoUrl(""); }}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Insert Video</h3>
+            <label className="text-[11px] text-white/30 mb-1.5 block uppercase tracking-wider">Video URL (mp4, webm)</label>
+            <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://example.com/video.mp4"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none mb-3" />
+            <button onClick={addVideoElement} disabled={!videoUrl}
+              className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50">Add Video</button>
+          </div>
+        </div>
+      )}
+
+      {/* Audio Dialog */}
+      {showAudioDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAudioDialog(false); setAudioUrl(""); }}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Insert Audio</h3>
+            <label className="text-[11px] text-white/30 mb-1.5 block uppercase tracking-wider">Audio URL (mp3, wav, ogg)</label>
+            <input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="https://example.com/audio.mp3"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none mb-3" />
+            <button onClick={addAudioElement} disabled={!audioUrl}
+              className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50">Add Audio</button>
+          </div>
+        </div>
+      )}
+
+      {/* GIF Dialog */}
+      {showGIFDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowGIFDialog(false); setGifUrl(""); }}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Insert GIF</h3>
+            <label className="text-[11px] text-white/30 mb-1.5 block uppercase tracking-wider">GIF URL</label>
+            <input value={gifUrl} onChange={(e) => setGifUrl(e.target.value)} placeholder="https://example.com/animation.gif"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none mb-3" />
+            <button onClick={addGIFElement} disabled={!gifUrl}
+              className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50">Add GIF</button>
+          </div>
+        </div>
+      )}
+
+      {/* Collage Dialog */}
+      {showCollageDialog && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowCollageDialog(false)}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-[420px] border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Photo Collage</h3>
+            <p className="text-xs text-white/40 mb-4">Choose a layout template. Image placeholders will be added to the slide.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { id: "2-grid", label: "2 Grid", cols: 2, rows: 1 },
+                { id: "3-grid", label: "3 Grid", cols: 3, rows: 1 },
+                { id: "4-grid", label: "4 Grid", cols: 2, rows: 2 },
+                { id: "3-column", label: "3 Column", cols: 3, rows: 2 },
+                { id: "4-column", label: "4 Column", cols: 4, rows: 2 },
+                { id: "2+1", label: "2+1", cols: 3, rows: 2, desc: "Large + 2 small" },
+                { id: "1+2", label: "1+2", cols: 3, rows: 2, desc: "2 small + Large" },
+                { id: "spotlight", label: "Spotlight", cols: 1, rows: 1 },
+              ].map((t) => (
+                <button key={t.id} onClick={() => handleCollageTemplate(t.id)}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-3 transition-all group">
+                  <div className="grid gap-0.5 mb-1.5" style={{ gridTemplateColumns: `repeat(${t.cols}, 1fr)`, gridTemplateRows: `repeat(${t.rows}, 1fr)` }}>
+                    {Array.from({ length: t.cols * t.rows }).map((_, i) => (
+                      <div key={i} className="aspect-video bg-white/10 rounded group-hover:bg-sienna/30 transition-colors" />
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-white/50 group-hover:text-white transition-colors">{t.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QR Dialog */}
       {showQRDialog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowQRDialog(false)}>
@@ -2217,6 +3294,22 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50">Add QR Code</button>
           </div>
         </div>
+      )}
+
+      {/* LaTeX Editor Modal */}
+      {showLatexEditor && (
+        <LatexEditorModal
+          initialValue={editingLatexId ? currentSlide.elements.find(e => e.id === editingLatexId)?.content : undefined}
+          onInsert={handleLatexInsert}
+          onClose={() => { setShowLatexEditor(false); setEditingLatexId(null); }} />
+      )}
+
+      {/* Mermaid Editor Modal */}
+      {showMermaidEditor && (
+        <MermaidEditorModal
+          initialValue={editingMermaidId ? currentSlide.elements.find(e => e.id === editingMermaidId)?.content : undefined}
+          onInsert={handleMermaidInsert}
+          onClose={() => { setShowMermaidEditor(false); setEditingMermaidId(null); }} />
       )}
 
       {/* Share modal */}
@@ -2250,6 +3343,77 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
               <option value="morph">Morph</option>
             </select>
             <button onClick={() => setShowSettings(false)} className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Slide Show */}
+      {showCustomShow && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowCustomShow(false)}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-[480px] border border-white/10 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">Custom Slide Show</h3>
+            {customShows.length > 0 && (
+              <div className="mb-4">
+                <label className="text-[11px] text-white/30 mb-2 block uppercase tracking-wider">Saved Shows</label>
+                <div className="space-y-1">
+                  {customShows.map((show) => (
+                    <div key={show.id} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
+                      <div>
+                        <span className="text-xs text-white/70">{show.name}</span>
+                        <span className="text-[10px] text-white/30 ml-2">({show.slideIndices.length} slides)</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { window.open(`/present/${presentationId}?show=${show.id}`, "_blank"); }}
+                          className="text-[10px] bg-sienna text-white px-3 py-1 rounded hover:bg-sienna-dark transition-all">Present</button>
+                        <button onClick={async () => {
+                          const updated = customShows.filter((s) => s.id !== show.id);
+                          setCustomShows(updated);
+                          const supabase = (await import("@/lib/supabase/client")).createClient();
+                          await supabase.from("presentations").update({ custom_shows: updated as any }).eq("id", presentationId);
+                        }}
+                          className="text-[10px] text-red-400 px-2 py-1 rounded hover:bg-red-400/10 transition-all">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mb-3">
+              <label className="text-[11px] text-white/30 mb-2 block uppercase tracking-wider">Select Slides</label>
+              <div className="grid grid-cols-5 gap-1.5 max-h-40 overflow-y-auto">
+                {slides.map((s, i) => (
+                  <button key={s.id} onClick={() => {
+                    const next = new Set(selectedCustomIndices);
+                    if (next.has(i)) next.delete(i); else next.add(i);
+                    setSelectedCustomIndices(next);
+                  }}
+                    className={`aspect-video rounded border text-[8px] transition-all ${
+                      selectedCustomIndices.has(i) ? "border-sienna bg-sienna/10" : "border-white/10 hover:border-white/30"
+                    }`}
+                    style={{ background: s.background }}>
+                    <div className="w-full h-full flex items-center justify-center text-white/40">{i + 1}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-4">
+              <input value={customShowName} onChange={(e) => setCustomShowName(e.target.value)}
+                placeholder="Show name..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none" />
+              <button onClick={async () => {
+                if (selectedCustomIndices.size === 0) return;
+                const show = createCustomShow(slides, Array.from(selectedCustomIndices).sort((a, b) => a - b), customShowName || `Custom Show ${customShows.length + 1}`);
+                await saveCustomShow(show, presentationId);
+                setCustomShows([...customShows, show]);
+                setSelectedCustomIndices(new Set());
+                setCustomShowName("");
+              }}
+                className="bg-sienna text-white text-xs px-4 py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50"
+                disabled={selectedCustomIndices.size === 0}>
+                Create Show
+              </button>
+            </div>
+            <button onClick={() => setShowCustomShow(false)} className="w-full bg-white/5 text-white/50 text-xs py-2 rounded-lg hover:bg-white/10 transition-all">Close</button>
           </div>
         </div>
       )}
@@ -2340,28 +3504,137 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
         </div>
       )}
 
+      {/* AI Generate Slides Modal */}
+      {showAIGenerate && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAIGenerate(false); setAiGeneratedSlides([]); }}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-[540px] border border-white/10 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">AI Generate Slides</h3>
+            <div className="flex gap-2 mb-4">
+              <input value={aiGenerateTopic} onChange={(e) => setAiGenerateTopic(e.target.value)}
+                placeholder="Enter a topic (e.g. Climate Change, React Hooks, Marketing Strategy)..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none"
+                onKeyDown={async (e) => { if (e.key === "Enter" && aiGenerateTopic) { setAiGenerating(true); setAiGeneratedSlides([]); const s = await generateSlideContent(aiGenerateTopic, aiGenerateCount); setAiGeneratedSlides(s); setAiGenerating(false); } }} />
+              <button onClick={async () => { if (!aiGenerateTopic) return; setAiGenerating(true); setAiGeneratedSlides([]); const s = await generateSlideContent(aiGenerateTopic, aiGenerateCount); setAiGeneratedSlides(s); setAiGenerating(false); }}
+                disabled={aiGenerating || !aiGenerateTopic}
+                className="bg-sienna text-white text-xs px-4 py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50 flex items-center gap-1.5">
+                {aiGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                {aiGenerating ? "Generating..." : "Generate"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-[10px] text-white/30 uppercase tracking-wider">Slides: {aiGenerateCount}</span>
+              <input type="range" min="3" max="15" value={aiGenerateCount} onChange={(e) => setAiGenerateCount(parseInt(e.target.value))} className="flex-1 accent-sienna h-1" />
+            </div>
+            {aiGeneratedSlides.length > 0 && (
+              <>
+                <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                  {aiGeneratedSlides.map((slide, i) => (
+                    <div key={slide.id} className="bg-white/5 rounded-lg p-3 border border-white/5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-white/70">Slide {i + 1}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ background: slide.background.startsWith("linear") ? "#1A1715" : slide.background }} />
+                      </div>
+                      <div className="text-xs text-white/90 font-medium mb-1">{slide.title}</div>
+                      <div className="space-y-0.5">
+                        {slide.elements?.filter((e: any) => e.type === "text" && e.content?.startsWith("•")).map((e: any, j: number) => (
+                          <div key={j} className="text-[10px] text-white/50 truncate">{e.content}</div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => {
+                  const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+                  aiGeneratedSlides.forEach((s) => { u.splice(activeSlide + 1, 0, s); });
+                  updateSlides(u, activeSlide + 1);
+                  setShowAIGenerate(false);
+                  setAiGeneratedSlides([]);
+                }} className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all flex items-center justify-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Add All ({aiGeneratedSlides.length} slides)
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AI Image Modal */}
+      {showAIImage && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => { setShowAIImage(false); setAiGeneratedImage(""); }}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-[480px] border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-heading text-lg text-white mb-4">AI Generate Image</h3>
+            <input value={aiImagePrompt} onChange={(e) => setAiImagePrompt(e.target.value)}
+              placeholder="Describe the image you want..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none mb-3" />
+            <div className="mb-3">
+              <label className="text-[10px] text-white/30 mb-1 block uppercase tracking-wider">Style</label>
+              <select value={aiImageStyle} onChange={(e) => setAiImageStyle(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none">
+                {getStyleOptions().map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}</option>
+                ))}
+              </select>
+            </div>
+            <button onClick={async () => { if (!aiImagePrompt) return; setAiImageGenerating(true); const url = await generateImage(aiImagePrompt, aiImageStyle); setAiGeneratedImage(url); setAiImageGenerating(false); }}
+              disabled={aiImageGenerating || !aiImagePrompt}
+              className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 mb-4">
+              {aiImageGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+              {aiImageGenerating ? "Generating..." : "Generate Image"}
+            </button>
+            {aiGeneratedImage && (
+              <div>
+                <div className="rounded-lg overflow-hidden bg-[#1A1715] mb-3 flex items-center justify-center" style={{ minHeight: 160 }}>
+                  <img src={aiGeneratedImage} alt="AI Generated" className="max-w-full max-h-48 object-contain" />
+                </div>
+                <button onClick={() => {
+                  const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+                  u[activeSlide].elements.push({
+                    id: String(Date.now()), type: "image", x: 100, y: 100,
+                    width: 300, height: 200, content: aiGeneratedImage,
+                    alt: aiImagePrompt, color: "#FFFFFF",
+                    zIndex: currentSlide.elements.length, visible: true, locked: false, rotation: 0, opacity: 1,
+                  });
+                  updateSlides(u);
+                  setShowAIImage(false);
+                  setAiGeneratedImage("");
+                }} className="w-full bg-sienna text-white text-xs py-2 rounded-lg hover:bg-sienna-dark transition-all">Add to Slide</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Background Remover Modal */}
+      {showBackgroundRemover && activeEl?.type === "image" && (
+        <BackgroundRemoverModal
+          onApply={(dataUrl) => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const el = u[activeSlide].elements.find(x => x.id === activeElement);
+            if (el && el.type === "image") { el.content = dataUrl; updateSlides(u); }
+            setShowBackgroundRemover(false);
+          }}
+          onClose={() => setShowBackgroundRemover(false)}
+        />
+      )}
+
       {/* Keyboard Shortcuts Help */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowHelp(false)}>
-          <div className="bg-[#2A2523] rounded-xl p-6 w-80 border border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#2A2523] rounded-xl p-6 w-96 border border-white/10" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-heading text-lg text-white mb-4">Keyboard Shortcuts</h3>
-            <div className="space-y-2 text-xs text-white/60">
-              {[
-                ["Ctrl+Z", "Undo"],
-                ["Ctrl+Shift+Z / Ctrl+Y", "Redo"],
-                ["Ctrl+D", "Duplicate element"],
-                ["Ctrl+A", "Select all elements"],
-                ["Delete / Backspace", "Delete element"],
-                ["Arrow keys", "Nudge element 5px"],
-                ["?", "Toggle this help"],
-              ].map(([key, desc]) => (
-                <div key={key} className="flex justify-between items-center">
-                  <kbd className="bg-white/10 px-2 py-0.5 rounded text-[10px] text-white/40 font-mono">{key}</kbd>
-                  <span>{desc}</span>
+            <div className="space-y-2 text-xs text-white/60 max-h-60 overflow-y-auto">
+              {Object.entries(loadShortcuts()).slice(0, 20).map(([action, shortcut]) => (
+                <div key={action} className="flex justify-between items-center">
+                  <kbd className="bg-white/10 px-2 py-0.5 rounded text-[10px] text-white/40 font-mono">{shortcut}</kbd>
+                  <span className="capitalize">{action.replace(/([A-Z])/g, ' $1').trim()}</span>
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowHelp(false)} className="w-full mt-4 text-xs text-white/40 hover:text-white/60 transition-colors">Close</button>
+            <button onClick={() => { setShowHelp(false); setShowShortcutCustomizer(true); }}
+              className="w-full mt-3 flex items-center justify-center gap-1.5 text-xs text-sienna bg-sienna/10 hover:bg-sienna/20 py-2 rounded-lg transition-all">
+              <Keyboard className="w-3.5 h-3.5" /> Customize Shortcuts
+            </button>
+            <button onClick={() => setShowHelp(false)} className="w-full mt-2 text-xs text-white/40 hover:text-white/60 transition-colors">Close</button>
           </div>
         </div>
       )}
@@ -2390,6 +3663,119 @@ export default function EditorPage({ params }: { params: Promise<{ id: string }>
           </div>
         </div>
       )}
+
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        commands={buildCommandList({
+          addSlide: () => addSlide(),
+          deleteSlide: () => deleteSlide(activeSlide),
+          duplicateSlide: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const dup = JSON.parse(JSON.stringify(u[activeSlide]));
+            dup.id = String(Date.now());
+            dup.elements = (dup.elements || []).map((el: SlideElement) => ({ ...el, id: String(Date.now()) + Math.random() }));
+            u.splice(activeSlide + 1, 0, dup);
+            updateSlides(u, activeSlide + 1);
+          },
+          addText: () => addElement("text"),
+          addImage: () => { const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.click(); },
+          addShape: () => { setShowShapeMenu(true); },
+          addVideo: () => setShowVideoDialog(true),
+          addCode: () => addElement("code"),
+          undo,
+          redo,
+          copy: copySelectedToClipboard,
+          paste: pasteFromClipboard,
+          deleteSelected: () => {
+            if (selectedElements.length > 0) {
+              selectedElements.forEach(id => { if (id) deleteElement(id); });
+            } else if (activeElement) {
+              deleteElement(activeElement);
+            }
+          },
+          bold: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.fontWeight = e.fontWeight === "bold" ? "normal" : "bold"; updateSlides(u); }
+          },
+          italic: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.fontStyle = e.fontStyle === "italic" ? "normal" : "italic"; updateSlides(u); }
+          },
+          underline: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.textDecoration = e.textDecoration === "underline" ? undefined : "underline"; updateSlides(u); }
+          },
+          alignLeft: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.textAlign = "left"; updateSlides(u); }
+          },
+          alignCenter: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.textAlign = "center"; updateSlides(u); }
+          },
+          alignRight: () => {
+            const u = JSON.parse(JSON.stringify(slides)) as Slide[];
+            const e = u[activeSlide].elements.find((x: SlideElement) => x.id === activeElement);
+            if (e) { e.textAlign = "right"; updateSlides(u); }
+          },
+          exportPDF: () => exportToPDF(title, slides),
+          exportPPTX: () => exportToPPTX(title, slides),
+          exportHTML,
+          toggleGrid: () => setShowGrid(!showGrid),
+          toggleSnap: () => setSnapEnabled(!snapEnabled),
+          zoomIn: () => setZoom(Math.min(200, zoom + 10)),
+          zoomOut: () => setZoom(Math.max(25, zoom - 10)),
+          zoomReset: () => setZoom(100),
+          zoomFit: () => setZoom(Math.max(25, Math.min(200, Math.floor(window.innerHeight / 405 * 100)))),
+          toggleLayers: () => {},
+          toggleAnimations: () => setShowAnimations(!showAnimations),
+          toggleNotes: () => setShowNotes(!showNotes),
+          showHelp: () => setShowHelp(true),
+          showSettings: () => setShowSettings(true),
+          present: () => window.open(`/present/${presentationId}`, "_blank"),
+          aiGenerate: () => setShowAIGenerate(true),
+          stockImages: () => setShowStockImages(true),
+          fullscreen: () => { if (document.fullscreenElement) { document.exitFullscreen(); } else { document.documentElement.requestFullscreen(); } },
+          selectAll: () => {
+            const all = currentSlide.elements.map(el => el.id);
+            setSelectedElements(all);
+          },
+          group: groupElements,
+          ungroup: ungroupElements,
+        })}
+      />
+
+      {/* Custom Theme Editor */}
+      {showCustomThemeEditor && (
+        <CustomThemeEditor
+          onApply={(theme) => {
+            const u = applyThemeToSlides(slides as any, theme);
+            updateSlides(u as Slide[]);
+            setShowCustomThemeEditor(false);
+          }}
+          onClose={() => setShowCustomThemeEditor(false)}
+        />
+      )}
+
+      {/* Shortcut Customizer */}
+      <ShortcutCustomizer
+        isOpen={showShortcutCustomizer}
+        onClose={() => setShowShortcutCustomizer(false)}
+      />
+
+      {/* Plugin Manager */}
+      <PluginManager
+        isOpen={showPluginManager}
+        onClose={() => setShowPluginManager(false)}
+        registry={pluginRegistry}
+      />
     </div>
   );
 }

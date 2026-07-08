@@ -56,6 +56,9 @@ export interface Database {
           slides: Json[];
           template: string;
           status: "draft" | "published";
+          custom_shows: Json[];
+          is_public: boolean;
+          version_history: Json[];
           created_at: string;
           updated_at: string;
         };
@@ -67,6 +70,9 @@ export interface Database {
           slides?: Json[];
           template?: string;
           status?: "draft" | "published";
+          custom_shows?: Json[];
+          is_public?: boolean;
+          version_history?: Json[];
           created_at?: string;
           updated_at?: string;
         };
@@ -78,6 +84,9 @@ export interface Database {
           slides?: Json[];
           template?: string;
           status?: "draft" | "published";
+          custom_shows?: Json[];
+          is_public?: boolean;
+          version_history?: Json[];
           created_at?: string;
           updated_at?: string;
         };
