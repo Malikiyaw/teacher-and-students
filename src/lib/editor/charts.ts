@@ -113,3 +113,4 @@ export function renderChartSVG(data: ChartData, type: ChartType, width: number, 
   }
 
   return "";
+}
